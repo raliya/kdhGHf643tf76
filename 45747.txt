@@ -1,0 +1,3135 @@
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\backup-before-build6-20260904-110355\Services\WebsiteVerificationService.cs, строка 184 =====
+            X509Certificate2? serverCertificate = null;
+            SslPolicyErrors certificateErrors = SslPolicyErrors.None;
+
+            using var handler = new HttpClientHandler
+            {
+                AllowAutoRedirect = true,
+                MaxAutomaticRedirections = 10,
+                AutomaticDecompression =
+                    DecompressionMethods.GZip |
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\backup-before-build6-20260904-110355\Services\WebsiteVerificationService.cs, строка 212 =====
+                    };
+            }
+
+            using var client = new HttpClient(handler)
+            {
+                Timeout = timeout
+            };
+
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\backup-before-build6-20260904-110355\Services\WebsiteVerificationService.cs, строка 227 =====
+                    address);
+
+                using HttpResponseMessage response =
+                    await client.SendAsync(
+                        request,
+                        HttpCompletionOption.ResponseHeadersRead,
+                        cancellationToken);
+
+                int statusCode = (int)response.StatusCode;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\backup-before-build6-20260904-110510\Services\WebsiteVerificationService.cs, строка 184 =====
+            X509Certificate2? serverCertificate = null;
+            SslPolicyErrors certificateErrors = SslPolicyErrors.None;
+
+            using var handler = new HttpClientHandler
+            {
+                AllowAutoRedirect = true,
+                MaxAutomaticRedirections = 10,
+                AutomaticDecompression =
+                    DecompressionMethods.GZip |
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\backup-before-build6-20260904-110510\Services\WebsiteVerificationService.cs, строка 212 =====
+                    };
+            }
+
+            using var client = new HttpClient(handler)
+            {
+                Timeout = timeout
+            };
+
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\backup-before-build6-20260904-110510\Services\WebsiteVerificationService.cs, строка 227 =====
+                    address);
+
+                using HttpResponseMessage response =
+                    await client.SendAsync(
+                        request,
+                        HttpCompletionOption.ResponseHeadersRead,
+                        cancellationToken);
+
+                int statusCode = (int)response.StatusCode;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\FileProcessingService.cs, строка 864 =====
+        string oldRoot,
+        string newRoot)
+    {
+        var relativePath = Path.GetRelativePath(
+            oldRoot,
+            path);
+
+        return Path.Combine(
+            newRoot,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\FileProcessingService.cs, строка 870 =====
+
+        return Path.Combine(
+            newRoot,
+            relativePath);
+    }
+
+    private static void DeleteDirectoryIfExists(
+        string path)
+    {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\IspmanagerAutomationService.cs, строка 163 =====
+            ));
+    }
+
+    private static HttpClient CreateClient(
+        IspmanagerSettings settings)
+    {
+        var handler = new HttpClientHandler();
+
+        if (settings.IgnoreCertificateErrors)
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\IspmanagerAutomationService.cs, строка 166 =====
+    private static HttpClient CreateClient(
+        IspmanagerSettings settings)
+    {
+        var handler = new HttpClientHandler();
+
+        if (settings.IgnoreCertificateErrors)
+        {
+            handler.ServerCertificateCustomValidationCallback =
+                HttpClientHandler
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\IspmanagerAutomationService.cs, строка 171 =====
+        if (settings.IgnoreCertificateErrors)
+        {
+            handler.ServerCertificateCustomValidationCallback =
+                HttpClientHandler
+                    .DangerousAcceptAnyServerCertificateValidator;
+        }
+
+        var client = new HttpClient(handler)
+        {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\IspmanagerAutomationService.cs, строка 175 =====
+                    .DangerousAcceptAnyServerCertificateValidator;
+        }
+
+        var client = new HttpClient(handler)
+        {
+            Timeout = RequestTimeout
+        };
+
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\IspmanagerAutomationService.cs, строка 187 =====
+    }
+
+    private static async Task<string> AuthenticateAsync(
+        HttpClient client,
+        IspmanagerSettings settings,
+        string password,
+        CancellationToken cancellationToken)
+    {
+        var form = new Dictionary<string, string>
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\IspmanagerAutomationService.cs, строка 249 =====
+    }
+
+    private static async Task<ApiResult> CallAsync(
+        HttpClient client,
+        IspmanagerSettings settings,
+        string sessionId,
+        string function,
+        IReadOnlyDictionary<string, string>? parameters,
+        CancellationToken cancellationToken)
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\IspmanagerAutomationService.cs, строка 280 =====
+    }
+
+    private static async Task<ApiResult> SendFormAsync(
+        HttpClient client,
+        string url,
+        IReadOnlyDictionary<string, string> form,
+        CancellationToken cancellationToken)
+    {
+        using var content =
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\IspmanagerAutomationService.cs, строка 384 =====
+    }
+
+    private static async Task<bool> DomainExistsAsync(
+        HttpClient client,
+        IspmanagerSettings settings,
+        string sessionId,
+        string domain,
+        CancellationToken cancellationToken)
+    {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 271 =====
+                    var uploadedStartFile =
+                        CombineRemote(
+                            uploadDirectory,
+                            startFile.RelativePath);
+
+                    if (!sftp.Exists(uploadedStartFile))
+                    {
+                        throw new InvalidOperationException(
+                            "Во временной папке отсутствует стартовый файл.");
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 324 =====
+                    var finalStartFile =
+                        CombineRemote(
+                            targetDirectory,
+                            startFile.RelativePath);
+
+                    RunChecked(
+                        ssh,
+                        $"test -f {ShellQuote(finalStartFile)}");
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 406 =====
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var relative = NormalizeRelativePath(
+                Path.GetRelativePath(
+                    localRoot,
+                    directory));
+
+            directories.Add(relative);
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 407 =====
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var relative = NormalizeRelativePath(
+                Path.GetRelativePath(
+                    localRoot,
+                    directory));
+
+            directories.Add(relative);
+        }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 450 =====
+                continue;
+            }
+
+            var relative = NormalizeRelativePath(
+                Path.GetRelativePath(
+                    localRoot,
+                    path));
+
+            files.Add(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 451 =====
+            }
+
+            var relative = NormalizeRelativePath(
+                Path.GetRelativePath(
+                    localRoot,
+                    path));
+
+            files.Add(
+                new LocalFile(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 473 =====
+        files.Sort(
+            (left, right) =>
+                StringComparer.OrdinalIgnoreCase.Compare(
+                    left.RelativePath,
+                    right.RelativePath));
+
+        return new LocalManifest(
+            files,
+            orderedDirectories,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 474 =====
+            (left, right) =>
+                StringComparer.OrdinalIgnoreCase.Compare(
+                    left.RelativePath,
+                    right.RelativePath));
+
+        return new LocalManifest(
+            files,
+            orderedDirectories,
+            files.Sum(file => file.Length));
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 497 =====
+            var result = files.FirstOrDefault(
+                file =>
+                    string.Equals(
+                        file.RelativePath,
+                        name,
+                        StringComparison.OrdinalIgnoreCase));
+
+            if (result is not null)
+            {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 537 =====
+
+            var remoteFile = CombineRemote(
+                remoteRoot,
+                file.RelativePath);
+
+            EnsureSftpDirectory(
+                sftp,
+                GetRemoteDirectoryName(remoteFile));
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 571 =====
+                    percent,
+                    $"Загружено: {uploadedFiles}/" +
+                    $"{manifest.Files.Count}; " +
+                    file.RelativePath));
+        }
+    }
+
+    private static void VerifyManifest(
+        SftpClient sftp,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 590 =====
+
+            var remoteFile = CombineRemote(
+                remoteRoot,
+                file.RelativePath);
+
+            if (!sftp.Exists(remoteFile))
+            {
+                throw new InvalidOperationException(
+                    $"На сервере отсутствует файл: {file.RelativePath}");
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 595 =====
+            if (!sftp.Exists(remoteFile))
+            {
+                throw new InvalidOperationException(
+                    $"На сервере отсутствует файл: {file.RelativePath}");
+            }
+
+            var attributes =
+                sftp.GetAttributes(remoteFile);
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 605 =====
+            {
+                throw new InvalidOperationException(
+                    $"Вместо файла обнаружен каталог: " +
+                    file.RelativePath);
+            }
+
+            var remoteSize =
+                Convert.ToInt64(attributes.Size);
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 615 =====
+            {
+                throw new InvalidOperationException(
+                    $"Размер файла не совпадает: " +
+                    $"{file.RelativePath}. " +
+                    $"Локально: {file.Length}; " +
+                    $"сервер: {remoteSize}.");
+            }
+
+            verifiedCount++;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 900 =====
+        return domain;
+    }
+
+    private static string NormalizeRelativePath(
+        string value)
+    {
+        var normalized =
+            value.Replace('\\', '/').Trim('/');
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 953 =====
+
+    private static string CombineRemote(
+        string root,
+        string relativePath)
+    {
+        var normalizedRoot =
+            NormalizeRemotePath(root);
+
+        var normalizedRelative =
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 959 =====
+            NormalizeRemotePath(root);
+
+        var normalizedRelative =
+            NormalizeRelativePath(relativePath);
+
+        return string.IsNullOrEmpty(normalizedRelative)
+            ? normalizedRoot
+            : normalizedRoot.TrimEnd('/') +
+              "/" +
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\SftpDeploymentService.cs, строка 1002 =====
+
+    private sealed record LocalFile(
+        string FullPath,
+        string RelativePath,
+        long Length);
+
+    private sealed record LocalManifest(
+        List<LocalFile> Files,
+        List<string> Directories,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\WebsiteVerificationService.cs, строка 184 =====
+            X509Certificate2? serverCertificate = null;
+            SslPolicyErrors certificateErrors = SslPolicyErrors.None;
+
+            using var handler = new HttpClientHandler
+            {
+                AllowAutoRedirect = true,
+                MaxAutomaticRedirections = 10,
+                AutomaticDecompression =
+                    DecompressionMethods.GZip |
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\WebsiteVerificationService.cs, строка 212 =====
+                    };
+            }
+
+            using var client = new HttpClient(handler)
+            {
+                Timeout = timeout
+            };
+
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\WebsiteVerificationService.cs, строка 227 =====
+                    address);
+
+                using HttpResponseMessage response =
+                    await client.SendAsync(
+                        request,
+                        HttpCompletionOption.ResponseHeadersRead,
+                        cancellationToken);
+
+                int statusCode = (int)response.StatusCode;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 178 =====
+
+public partial class MainWindow
+{
+    private TextBox? _spaceshipBaseUrlTextBox;
+    private TextBox? _spaceshipKeyTextBox;
+    private PasswordBox? _spaceshipSecretPasswordBox;
+    private TextBox? _spaceshipDomainTextBox;
+    private TextBox? _spaceshipDnsPathTextBox;
+    private TextBlock? _spaceshipSecretStatus;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 179 =====
+public partial class MainWindow
+{
+    private TextBox? _spaceshipBaseUrlTextBox;
+    private TextBox? _spaceshipKeyTextBox;
+    private PasswordBox? _spaceshipSecretPasswordBox;
+    private TextBox? _spaceshipDomainTextBox;
+    private TextBox? _spaceshipDnsPathTextBox;
+    private TextBlock? _spaceshipSecretStatus;
+    private TextBlock? _build7Status;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 180 =====
+{
+    private TextBox? _spaceshipBaseUrlTextBox;
+    private TextBox? _spaceshipKeyTextBox;
+    private PasswordBox? _spaceshipSecretPasswordBox;
+    private TextBox? _spaceshipDomainTextBox;
+    private TextBox? _spaceshipDnsPathTextBox;
+    private TextBlock? _spaceshipSecretStatus;
+    private TextBlock? _build7Status;
+    private ProgressBar? _build7Progress;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 181 =====
+    private TextBox? _spaceshipBaseUrlTextBox;
+    private TextBox? _spaceshipKeyTextBox;
+    private PasswordBox? _spaceshipSecretPasswordBox;
+    private TextBox? _spaceshipDomainTextBox;
+    private TextBox? _spaceshipDnsPathTextBox;
+    private TextBlock? _spaceshipSecretStatus;
+    private TextBlock? _build7Status;
+    private ProgressBar? _build7Progress;
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 182 =====
+    private TextBox? _spaceshipKeyTextBox;
+    private PasswordBox? _spaceshipSecretPasswordBox;
+    private TextBox? _spaceshipDomainTextBox;
+    private TextBox? _spaceshipDnsPathTextBox;
+    private TextBlock? _spaceshipSecretStatus;
+    private TextBlock? _build7Status;
+    private ProgressBar? _build7Progress;
+
+    private Button? _build7LocalButton;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 183 =====
+    private PasswordBox? _spaceshipSecretPasswordBox;
+    private TextBox? _spaceshipDomainTextBox;
+    private TextBox? _spaceshipDnsPathTextBox;
+    private TextBlock? _spaceshipSecretStatus;
+    private TextBlock? _build7Status;
+    private ProgressBar? _build7Progress;
+
+    private Button? _build7LocalButton;
+    private Button? _build7DomainButton;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 191 =====
+    private Button? _build7DomainButton;
+    private Button? _build7UploadButton;
+    private Button? _build7DatabaseButton;
+    private Button? _build7SpaceshipButton;
+    private Button? _build7AllButton;
+
+    private readonly HttpClient _spaceshipHttpClient =
+        new()
+        {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 194 =====
+    private Button? _build7SpaceshipButton;
+    private Button? _build7AllButton;
+
+    private readonly HttpClient _spaceshipHttpClient =
+        new()
+        {
+            Timeout = TimeSpan.FromSeconds(45)
+        };
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 224 =====
+                .Any(item =>
+                    string.Equals(
+                        item.Header?.ToString(),
+                        "Процессы / Spaceship",
+                        StringComparison.Ordinal)))
+            {
+                return;
+            }
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 234 =====
+                0,
+                CreateBuild7Tab());
+
+            LoadSpaceshipSettings();
+
+            AddLog(
+                "INFO",
+                string.Empty,
+                "Сборка 7 загружена: раздельные процессы, " +
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 240 =====
+                "INFO",
+                string.Empty,
+                "Сборка 7 загружена: раздельные процессы, " +
+                "общий запуск и настройки Spaceship API.");
+        }
+        catch (Exception exception)
+        {
+            var message = SensitiveDataRedactor.Redact(
+                exception.Message);
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 348 =====
+                await WaitForLegacyOperationAsync();
+            });
+
+        _build7SpaceshipButton = CreateProcessButton(
+            "5. Проверить Spaceship",
+            190,
+            TestSpaceshipForSelectedJobAsync);
+
+        _build7AllButton = CreateProcessButton(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 349 =====
+            });
+
+        _build7SpaceshipButton = CreateProcessButton(
+            "5. Проверить Spaceship",
+            190,
+            TestSpaceshipForSelectedJobAsync);
+
+        _build7AllButton = CreateProcessButton(
+            "ЗАПУСТИТЬ ВСЕ ПРОЦЕССЫ",
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 351 =====
+        _build7SpaceshipButton = CreateProcessButton(
+            "5. Проверить Spaceship",
+            190,
+            TestSpaceshipForSelectedJobAsync);
+
+        _build7AllButton = CreateProcessButton(
+            "ЗАПУСТИТЬ ВСЕ ПРОЦЕССЫ",
+            245,
+            RunAllProcessesAsync);
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 368 =====
+        processPanel.Children.Add(_build7DomainButton);
+        processPanel.Children.Add(_build7UploadButton);
+        processPanel.Children.Add(_build7DatabaseButton);
+        processPanel.Children.Add(_build7SpaceshipButton);
+        processPanel.Children.Add(_build7AllButton);
+
+        processBox.Content = processPanel;
+
+        Grid.SetRow(processBox, 0);
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 378 =====
+
+        var apiBox = new GroupBox
+        {
+            Header = "Spaceship API",
+            Margin = new Thickness(0, 0, 0, 12)
+        };
+
+        var apiGrid = new Grid
+        {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 408 =====
+                });
+        }
+
+        _spaceshipBaseUrlTextBox = AddTextSetting(
+            apiGrid,
+            0,
+            "Base URL:",
+            "https://spaceship.dev/api/v1");
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 412 =====
+            apiGrid,
+            0,
+            "Base URL:",
+            "https://spaceship.dev/api/v1");
+
+        _spaceshipKeyTextBox = AddTextSetting(
+            apiGrid,
+            1,
+            "API Key:",
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 414 =====
+            "Base URL:",
+            "https://spaceship.dev/api/v1");
+
+        _spaceshipKeyTextBox = AddTextSetting(
+            apiGrid,
+            1,
+            "API Key:",
+            string.Empty);
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 420 =====
+            "API Key:",
+            string.Empty);
+
+        _spaceshipSecretPasswordBox =
+            new PasswordBox
+            {
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 431 =====
+            2,
+            "API Secret:");
+
+        Grid.SetRow(_spaceshipSecretPasswordBox, 2);
+        Grid.SetColumn(_spaceshipSecretPasswordBox, 1);
+        apiGrid.Children.Add(_spaceshipSecretPasswordBox);
+
+        _spaceshipSecretStatus = new TextBlock
+        {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 432 =====
+            "API Secret:");
+
+        Grid.SetRow(_spaceshipSecretPasswordBox, 2);
+        Grid.SetColumn(_spaceshipSecretPasswordBox, 1);
+        apiGrid.Children.Add(_spaceshipSecretPasswordBox);
+
+        _spaceshipSecretStatus = new TextBlock
+        {
+            Margin = new Thickness(0, 0, 0, 8),
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 433 =====
+
+        Grid.SetRow(_spaceshipSecretPasswordBox, 2);
+        Grid.SetColumn(_spaceshipSecretPasswordBox, 1);
+        apiGrid.Children.Add(_spaceshipSecretPasswordBox);
+
+        _spaceshipSecretStatus = new TextBlock
+        {
+            Margin = new Thickness(0, 0, 0, 8),
+            Foreground = Brushes.DimGray,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 435 =====
+        Grid.SetColumn(_spaceshipSecretPasswordBox, 1);
+        apiGrid.Children.Add(_spaceshipSecretPasswordBox);
+
+        _spaceshipSecretStatus = new TextBlock
+        {
+            Margin = new Thickness(0, 0, 0, 8),
+            Foreground = Brushes.DimGray,
+            Text = "API Secret ещё не сохранён."
+        };
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 442 =====
+            Text = "API Secret ещё не сохранён."
+        };
+
+        Grid.SetRow(_spaceshipSecretStatus, 3);
+        Grid.SetColumn(_spaceshipSecretStatus, 1);
+        apiGrid.Children.Add(_spaceshipSecretStatus);
+
+        _spaceshipDomainTextBox = AddTextSetting(
+            apiGrid,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 443 =====
+        };
+
+        Grid.SetRow(_spaceshipSecretStatus, 3);
+        Grid.SetColumn(_spaceshipSecretStatus, 1);
+        apiGrid.Children.Add(_spaceshipSecretStatus);
+
+        _spaceshipDomainTextBox = AddTextSetting(
+            apiGrid,
+            4,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 444 =====
+
+        Grid.SetRow(_spaceshipSecretStatus, 3);
+        Grid.SetColumn(_spaceshipSecretStatus, 1);
+        apiGrid.Children.Add(_spaceshipSecretStatus);
+
+        _spaceshipDomainTextBox = AddTextSetting(
+            apiGrid,
+            4,
+            "Домен для проверки:",
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 446 =====
+        Grid.SetColumn(_spaceshipSecretStatus, 1);
+        apiGrid.Children.Add(_spaceshipSecretStatus);
+
+        _spaceshipDomainTextBox = AddTextSetting(
+            apiGrid,
+            4,
+            "Домен для проверки:",
+            string.Empty);
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 452 =====
+            "Домен для проверки:",
+            string.Empty);
+
+        _spaceshipDnsPathTextBox = AddTextSetting(
+            apiGrid,
+            5,
+            "DNS path:",
+            "dns/records/{domain}");
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 465 =====
+
+        var saveButton = new Button
+        {
+            Content = "Сохранить Spaceship",
+            Width = 190,
+            Padding = new Thickness(10, 6, 10, 6),
+            Margin = new Thickness(0, 0, 8, 8)
+        };
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 475 =====
+        {
+            try
+            {
+                SaveSpaceshipSettings();
+
+                SetBuild7Status(
+                    0,
+                    "Настройки Spaceship сохранены. " +
+                    "API Secret защищён Windows DPAPI.");
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 479 =====
+
+                SetBuild7Status(
+                    0,
+                    "Настройки Spaceship сохранены. " +
+                    "API Secret защищён Windows DPAPI.");
+
+                AddLog(
+                    "INFO",
+                    string.Empty,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 485 =====
+                AddLog(
+                    "INFO",
+                    string.Empty,
+                    "Настройки Spaceship сохранены. " +
+                    "API Secret в журнал не записан.");
+            }
+            catch (Exception exception)
+            {
+                ShowBuild7Error(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 498 =====
+
+        var testButton = new Button
+        {
+            Content = "Проверить Spaceship API",
+            Width = 205,
+            Padding = new Thickness(10, 6, 10, 6),
+            Margin = new Thickness(0, 0, 8, 8)
+        };
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 506 =====
+
+        testButton.Click += async (_, _) =>
+            await ExecuteBuild7OperationAsync(
+                TestSpaceshipForSelectedJobAsync);
+
+        apiButtons.Children.Add(saveButton);
+        apiButtons.Children.Add(testButton);
+
+        Grid.SetRow(apiButtons, 6);
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 556 =====
+
+        return new TabItem
+        {
+            Header = "Процессы / Spaceship",
+            Content = new ScrollViewer
+            {
+                VerticalScrollBarVisibility =
+                    ScrollBarVisibility.Auto,
+                Content = root
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 638 =====
+            "2. Создание WWW-домена.\n" +
+            "3. Загрузка файлов.\n" +
+            "4. Создание БД и импорт SQL.\n" +
+            "5. Проверка доступа к DNS через Spaceship API.\n\n" +
+            "Текущие обработчики могут запросить дополнительное " +
+            "подтверждение опасных операций.",
+            "Полный процесс",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 730 =====
+                CalculateAllPercent(
+                    completedStages,
+                    totalStages),
+                $"{job.Domain}: проверка Spaceship DNS API.");
+
+            if (_spaceshipDomainTextBox is not null)
+            {
+                _spaceshipDomainTextBox.Text = job.Domain;
+            }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 732 =====
+                    totalStages),
+                $"{job.Domain}: проверка Spaceship DNS API.");
+
+            if (_spaceshipDomainTextBox is not null)
+            {
+                _spaceshipDomainTextBox.Text = job.Domain;
+            }
+
+            await TestSpaceshipAsync(job.Domain);
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 734 =====
+
+            if (_spaceshipDomainTextBox is not null)
+            {
+                _spaceshipDomainTextBox.Text = job.Domain;
+            }
+
+            await TestSpaceshipAsync(job.Domain);
+            completedStages++;
+        }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 737 =====
+                _spaceshipDomainTextBox.Text = job.Domain;
+            }
+
+            await TestSpaceshipAsync(job.Domain);
+            completedStages++;
+        }
+
+        SetBuild7Status(
+            100,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 788 =====
+            99);
+    }
+
+    private async Task TestSpaceshipForSelectedJobAsync()
+    {
+        var domain =
+            _spaceshipDomainTextBox?.Text.Trim();
+
+        if (string.IsNullOrWhiteSpace(domain))
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 791 =====
+    private async Task TestSpaceshipForSelectedJobAsync()
+    {
+        var domain =
+            _spaceshipDomainTextBox?.Text.Trim();
+
+        if (string.IsNullOrWhiteSpace(domain))
+        {
+            domain = GetSelectedJob()?.Domain;
+        }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 801 =====
+        if (string.IsNullOrWhiteSpace(domain))
+        {
+            throw new InvalidOperationException(
+                "Укажите домен Spaceship или выберите задание.");
+        }
+
+        await TestSpaceshipAsync(domain);
+    }
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 804 =====
+                "Укажите домен Spaceship или выберите задание.");
+        }
+
+        await TestSpaceshipAsync(domain);
+    }
+
+    private async Task TestSpaceshipAsync(string domain)
+    {
+        var settings = ReadSpaceshipSettings();
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 807 =====
+        await TestSpaceshipAsync(domain);
+    }
+
+    private async Task TestSpaceshipAsync(string domain)
+    {
+        var settings = ReadSpaceshipSettings();
+
+        if (string.IsNullOrWhiteSpace(settings.ApiSecret))
+        {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 809 =====
+
+    private async Task TestSpaceshipAsync(string domain)
+    {
+        var settings = ReadSpaceshipSettings();
+
+        if (string.IsNullOrWhiteSpace(settings.ApiSecret))
+        {
+            throw new InvalidOperationException(
+                "Введите или сохраните Spaceship API Secret.");
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 814 =====
+        if (string.IsNullOrWhiteSpace(settings.ApiSecret))
+        {
+            throw new InvalidOperationException(
+                "Введите или сохраните Spaceship API Secret.");
+        }
+
+        SaveSpaceshipSettings();
+
+        var relativePath = settings.DnsPath
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 817 =====
+                "Введите или сохраните Spaceship API Secret.");
+        }
+
+        SaveSpaceshipSettings();
+
+        var relativePath = settings.DnsPath
+            .Replace(
+                "{domain}",
+                Uri.EscapeDataString(domain),
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 819 =====
+
+        SaveSpaceshipSettings();
+
+        var relativePath = settings.DnsPath
+            .Replace(
+                "{domain}",
+                Uri.EscapeDataString(domain),
+                StringComparison.OrdinalIgnoreCase)
+            .TrimStart('/');
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 826 =====
+                StringComparison.OrdinalIgnoreCase)
+            .TrimStart('/');
+
+        var baseUrl = settings.BaseUrl.TrimEnd('/');
+        var requestUrl = baseUrl + "/" + relativePath;
+
+        SetBuild7Status(
+            _build7Progress?.Value ?? 0,
+            $"Spaceship API: чтение DNS-зоны {domain}.");
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 827 =====
+            .TrimStart('/');
+
+        var baseUrl = settings.BaseUrl.TrimEnd('/');
+        var requestUrl = baseUrl + "/" + relativePath;
+
+        SetBuild7Status(
+            _build7Progress?.Value ?? 0,
+            $"Spaceship API: чтение DNS-зоны {domain}.");
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 831 =====
+
+        SetBuild7Status(
+            _build7Progress?.Value ?? 0,
+            $"Spaceship API: чтение DNS-зоны {domain}.");
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            requestUrl);
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 835 =====
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            requestUrl);
+
+        request.Headers.TryAddWithoutValidation(
+            "X-API-Key",
+            settings.ApiKey);
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 846 =====
+            settings.ApiSecret);
+
+        using var response =
+            await _spaceshipHttpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead);
+
+        var body = await response.Content.ReadAsStringAsync();
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 860 =====
+                settings.ApiSecret);
+
+            throw new InvalidOperationException(
+                $"Spaceship API вернул HTTP " +
+                $"{(int)response.StatusCode} " +
+                $"{response.ReasonPhrase}. {safeBody}");
+        }
+
+        var resultDescription = DescribeJson(body);
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 871 =====
+            Math.Max(
+                1,
+                (int)(_build7Progress?.Value ?? 0)),
+            $"Spaceship API доступен. Домен: {domain}. " +
+            resultDescription);
+
+        AddLog(
+            "INFO",
+            domain,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 877 =====
+        AddLog(
+            "INFO",
+            domain,
+            "Spaceship API: DNS-зона успешно прочитана.");
+    }
+
+    private SpaceshipRuntimeSettings ReadSpaceshipSettings()
+    {
+        if (_spaceshipBaseUrlTextBox is null ||
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 880 =====
+            "Spaceship API: DNS-зона успешно прочитана.");
+    }
+
+    private SpaceshipRuntimeSettings ReadSpaceshipSettings()
+    {
+        if (_spaceshipBaseUrlTextBox is null ||
+            _spaceshipKeyTextBox is null ||
+            _spaceshipSecretPasswordBox is null ||
+            _spaceshipDnsPathTextBox is null)
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 882 =====
+
+    private SpaceshipRuntimeSettings ReadSpaceshipSettings()
+    {
+        if (_spaceshipBaseUrlTextBox is null ||
+            _spaceshipKeyTextBox is null ||
+            _spaceshipSecretPasswordBox is null ||
+            _spaceshipDnsPathTextBox is null)
+        {
+            throw new InvalidOperationException(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 883 =====
+    private SpaceshipRuntimeSettings ReadSpaceshipSettings()
+    {
+        if (_spaceshipBaseUrlTextBox is null ||
+            _spaceshipKeyTextBox is null ||
+            _spaceshipSecretPasswordBox is null ||
+            _spaceshipDnsPathTextBox is null)
+        {
+            throw new InvalidOperationException(
+                "Интерфейс Spaceship не инициализирован.");
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 884 =====
+    {
+        if (_spaceshipBaseUrlTextBox is null ||
+            _spaceshipKeyTextBox is null ||
+            _spaceshipSecretPasswordBox is null ||
+            _spaceshipDnsPathTextBox is null)
+        {
+            throw new InvalidOperationException(
+                "Интерфейс Spaceship не инициализирован.");
+        }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 885 =====
+        if (_spaceshipBaseUrlTextBox is null ||
+            _spaceshipKeyTextBox is null ||
+            _spaceshipSecretPasswordBox is null ||
+            _spaceshipDnsPathTextBox is null)
+        {
+            throw new InvalidOperationException(
+                "Интерфейс Spaceship не инициализирован.");
+        }
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 888 =====
+            _spaceshipDnsPathTextBox is null)
+        {
+            throw new InvalidOperationException(
+                "Интерфейс Spaceship не инициализирован.");
+        }
+
+        var stored = LoadSpaceshipSettingsFile();
+
+        var secret =
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 891 =====
+                "Интерфейс Spaceship не инициализирован.");
+        }
+
+        var stored = LoadSpaceshipSettingsFile();
+
+        var secret =
+            _spaceshipSecretPasswordBox.Password;
+
+        if (string.IsNullOrEmpty(secret) &&
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 894 =====
+        var stored = LoadSpaceshipSettingsFile();
+
+        var secret =
+            _spaceshipSecretPasswordBox.Password;
+
+        if (string.IsNullOrEmpty(secret) &&
+            !string.IsNullOrWhiteSpace(stored.EncryptedSecret))
+        {
+            secret = UnprotectSecret(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 903 =====
+                stored.EncryptedSecret);
+        }
+
+        var settings = new SpaceshipRuntimeSettings
+        {
+            BaseUrl = _spaceshipBaseUrlTextBox.Text.Trim(),
+            ApiKey = _spaceshipKeyTextBox.Text.Trim(),
+            ApiSecret = secret,
+            DnsPath = _spaceshipDnsPathTextBox.Text.Trim()
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 905 =====
+
+        var settings = new SpaceshipRuntimeSettings
+        {
+            BaseUrl = _spaceshipBaseUrlTextBox.Text.Trim(),
+            ApiKey = _spaceshipKeyTextBox.Text.Trim(),
+            ApiSecret = secret,
+            DnsPath = _spaceshipDnsPathTextBox.Text.Trim()
+        };
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 906 =====
+        var settings = new SpaceshipRuntimeSettings
+        {
+            BaseUrl = _spaceshipBaseUrlTextBox.Text.Trim(),
+            ApiKey = _spaceshipKeyTextBox.Text.Trim(),
+            ApiSecret = secret,
+            DnsPath = _spaceshipDnsPathTextBox.Text.Trim()
+        };
+
+        if (!Uri.TryCreate(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 908 =====
+            BaseUrl = _spaceshipBaseUrlTextBox.Text.Trim(),
+            ApiKey = _spaceshipKeyTextBox.Text.Trim(),
+            ApiSecret = secret,
+            DnsPath = _spaceshipDnsPathTextBox.Text.Trim()
+        };
+
+        if (!Uri.TryCreate(
+                settings.BaseUrl,
+                UriKind.Absolute,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 912 =====
+        };
+
+        if (!Uri.TryCreate(
+                settings.BaseUrl,
+                UriKind.Absolute,
+                out var uri) ||
+            uri.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 918 =====
+            uri.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException(
+                "Spaceship Base URL должен быть абсолютным HTTPS URL.");
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+        {
+            throw new InvalidOperationException(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 924 =====
+        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+        {
+            throw new InvalidOperationException(
+                "Не указан Spaceship API Key.");
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.DnsPath) ||
+            !settings.DnsPath.Contains(
+                "{domain}",
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 939 =====
+        return settings;
+    }
+
+    private void SaveSpaceshipSettings()
+    {
+        var settings = ReadSpaceshipSettings();
+
+        var stored = new SpaceshipStoredSettings
+        {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 941 =====
+
+    private void SaveSpaceshipSettings()
+    {
+        var settings = ReadSpaceshipSettings();
+
+        var stored = new SpaceshipStoredSettings
+        {
+            BaseUrl = settings.BaseUrl,
+            ApiKey = settings.ApiKey,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 943 =====
+    {
+        var settings = ReadSpaceshipSettings();
+
+        var stored = new SpaceshipStoredSettings
+        {
+            BaseUrl = settings.BaseUrl,
+            ApiKey = settings.ApiKey,
+            DnsPath = settings.DnsPath,
+            EncryptedSecret = ProtectSecret(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 945 =====
+
+        var stored = new SpaceshipStoredSettings
+        {
+            BaseUrl = settings.BaseUrl,
+            ApiKey = settings.ApiKey,
+            DnsPath = settings.DnsPath,
+            EncryptedSecret = ProtectSecret(
+                settings.ApiSecret)
+        };
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 953 =====
+        };
+
+        var directory = Path.GetDirectoryName(
+            SpaceshipSettingsPath);
+
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            throw new InvalidOperationException(
+                "Не удалось определить папку настроек.");
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 964 =====
+        Directory.CreateDirectory(directory);
+
+        var temporaryPath =
+            SpaceshipSettingsPath + ".tmp";
+
+        var json = JsonSerializer.Serialize(
+            stored,
+            new JsonSerializerOptions
+            {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 980 =====
+
+        File.Move(
+            temporaryPath,
+            SpaceshipSettingsPath,
+            true);
+
+        _spaceshipSecretPasswordBox?.Clear();
+
+        if (_spaceshipSecretStatus is not null)
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 983 =====
+            SpaceshipSettingsPath,
+            true);
+
+        _spaceshipSecretPasswordBox?.Clear();
+
+        if (_spaceshipSecretStatus is not null)
+        {
+            _spaceshipSecretStatus.Text =
+                "API Secret сохранён и защищён Windows DPAPI.";
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 985 =====
+
+        _spaceshipSecretPasswordBox?.Clear();
+
+        if (_spaceshipSecretStatus is not null)
+        {
+            _spaceshipSecretStatus.Text =
+                "API Secret сохранён и защищён Windows DPAPI.";
+        }
+    }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 987 =====
+
+        if (_spaceshipSecretStatus is not null)
+        {
+            _spaceshipSecretStatus.Text =
+                "API Secret сохранён и защищён Windows DPAPI.";
+        }
+    }
+
+    private void LoadSpaceshipSettings()
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 992 =====
+        }
+    }
+
+    private void LoadSpaceshipSettings()
+    {
+        var stored = LoadSpaceshipSettingsFile();
+
+        if (_spaceshipBaseUrlTextBox is not null)
+        {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 994 =====
+
+    private void LoadSpaceshipSettings()
+    {
+        var stored = LoadSpaceshipSettingsFile();
+
+        if (_spaceshipBaseUrlTextBox is not null)
+        {
+            _spaceshipBaseUrlTextBox.Text =
+                string.IsNullOrWhiteSpace(stored.BaseUrl)
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 996 =====
+    {
+        var stored = LoadSpaceshipSettingsFile();
+
+        if (_spaceshipBaseUrlTextBox is not null)
+        {
+            _spaceshipBaseUrlTextBox.Text =
+                string.IsNullOrWhiteSpace(stored.BaseUrl)
+                    ? "https://spaceship.dev/api/v1"
+                    : stored.BaseUrl;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 998 =====
+
+        if (_spaceshipBaseUrlTextBox is not null)
+        {
+            _spaceshipBaseUrlTextBox.Text =
+                string.IsNullOrWhiteSpace(stored.BaseUrl)
+                    ? "https://spaceship.dev/api/v1"
+                    : stored.BaseUrl;
+        }
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 999 =====
+        if (_spaceshipBaseUrlTextBox is not null)
+        {
+            _spaceshipBaseUrlTextBox.Text =
+                string.IsNullOrWhiteSpace(stored.BaseUrl)
+                    ? "https://spaceship.dev/api/v1"
+                    : stored.BaseUrl;
+        }
+
+        if (_spaceshipKeyTextBox is not null)
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1000 =====
+        {
+            _spaceshipBaseUrlTextBox.Text =
+                string.IsNullOrWhiteSpace(stored.BaseUrl)
+                    ? "https://spaceship.dev/api/v1"
+                    : stored.BaseUrl;
+        }
+
+        if (_spaceshipKeyTextBox is not null)
+        {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1001 =====
+            _spaceshipBaseUrlTextBox.Text =
+                string.IsNullOrWhiteSpace(stored.BaseUrl)
+                    ? "https://spaceship.dev/api/v1"
+                    : stored.BaseUrl;
+        }
+
+        if (_spaceshipKeyTextBox is not null)
+        {
+            _spaceshipKeyTextBox.Text = stored.ApiKey;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1004 =====
+                    : stored.BaseUrl;
+        }
+
+        if (_spaceshipKeyTextBox is not null)
+        {
+            _spaceshipKeyTextBox.Text = stored.ApiKey;
+        }
+
+        if (_spaceshipDnsPathTextBox is not null)
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1006 =====
+
+        if (_spaceshipKeyTextBox is not null)
+        {
+            _spaceshipKeyTextBox.Text = stored.ApiKey;
+        }
+
+        if (_spaceshipDnsPathTextBox is not null)
+        {
+            _spaceshipDnsPathTextBox.Text =
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1009 =====
+            _spaceshipKeyTextBox.Text = stored.ApiKey;
+        }
+
+        if (_spaceshipDnsPathTextBox is not null)
+        {
+            _spaceshipDnsPathTextBox.Text =
+                string.IsNullOrWhiteSpace(stored.DnsPath)
+                    ? "dns/records/{domain}"
+                    : stored.DnsPath;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1011 =====
+
+        if (_spaceshipDnsPathTextBox is not null)
+        {
+            _spaceshipDnsPathTextBox.Text =
+                string.IsNullOrWhiteSpace(stored.DnsPath)
+                    ? "dns/records/{domain}"
+                    : stored.DnsPath;
+        }
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1017 =====
+                    : stored.DnsPath;
+        }
+
+        if (_spaceshipSecretStatus is not null)
+        {
+            _spaceshipSecretStatus.Text =
+                string.IsNullOrWhiteSpace(stored.EncryptedSecret)
+                    ? "API Secret ещё не сохранён."
+                    : "Зашифрованный API Secret сохранён.";
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1019 =====
+
+        if (_spaceshipSecretStatus is not null)
+        {
+            _spaceshipSecretStatus.Text =
+                string.IsNullOrWhiteSpace(stored.EncryptedSecret)
+                    ? "API Secret ещё не сохранён."
+                    : "Зашифрованный API Secret сохранён.";
+        }
+    }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1026 =====
+        }
+    }
+
+    private SpaceshipStoredSettings LoadSpaceshipSettingsFile()
+    {
+        if (!File.Exists(SpaceshipSettingsPath))
+        {
+            return new SpaceshipStoredSettings();
+        }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1028 =====
+
+    private SpaceshipStoredSettings LoadSpaceshipSettingsFile()
+    {
+        if (!File.Exists(SpaceshipSettingsPath))
+        {
+            return new SpaceshipStoredSettings();
+        }
+
+        try
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1030 =====
+    {
+        if (!File.Exists(SpaceshipSettingsPath))
+        {
+            return new SpaceshipStoredSettings();
+        }
+
+        try
+        {
+            var json = File.ReadAllText(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1036 =====
+        try
+        {
+            var json = File.ReadAllText(
+                SpaceshipSettingsPath,
+                Encoding.UTF8);
+
+            return JsonSerializer.Deserialize<
+                       SpaceshipStoredSettings>(json) ??
+                   new SpaceshipStoredSettings();
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1040 =====
+                Encoding.UTF8);
+
+            return JsonSerializer.Deserialize<
+                       SpaceshipStoredSettings>(json) ??
+                   new SpaceshipStoredSettings();
+        }
+        catch
+        {
+            return new SpaceshipStoredSettings();
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1041 =====
+
+            return JsonSerializer.Deserialize<
+                       SpaceshipStoredSettings>(json) ??
+                   new SpaceshipStoredSettings();
+        }
+        catch
+        {
+            return new SpaceshipStoredSettings();
+        }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1045 =====
+        }
+        catch
+        {
+            return new SpaceshipStoredSettings();
+        }
+    }
+
+    private static string ProtectSecret(string value)
+    {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1062 =====
+        {
+            var encrypted = ProtectedData.Protect(
+                plainBytes,
+                SpaceshipEntropy,
+                DataProtectionScope.CurrentUser);
+
+            return Convert.ToBase64String(encrypted);
+        }
+        finally
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1078 =====
+        var encrypted = Convert.FromBase64String(value);
+        var plainBytes = ProtectedData.Unprotect(
+            encrypted,
+            SpaceshipEntropy,
+            DataProtectionScope.CurrentUser);
+
+        try
+        {
+            return Encoding.UTF8.GetString(plainBytes);
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1194 =====
+        if (_build7DatabaseButton is not null)
+            _build7DatabaseButton.IsEnabled = enabled;
+
+        if (_build7SpaceshipButton is not null)
+            _build7SpaceshipButton.IsEnabled = enabled;
+
+        if (_build7AllButton is not null)
+            _build7AllButton.IsEnabled = enabled;
+    }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1195 =====
+            _build7DatabaseButton.IsEnabled = enabled;
+
+        if (_build7SpaceshipButton is not null)
+            _build7SpaceshipButton.IsEnabled = enabled;
+
+        if (_build7AllButton is not null)
+            _build7AllButton.IsEnabled = enabled;
+    }
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1291 =====
+        return null;
+    }
+
+    private static string SpaceshipSettingsPath =>
+        Path.Combine(
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.LocalApplicationData),
+            "TextFileProcessor",
+            "spaceship-settings.json");
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1296 =====
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.LocalApplicationData),
+            "TextFileProcessor",
+            "spaceship-settings.json");
+
+    private static readonly byte[] SpaceshipEntropy =
+        Encoding.UTF8.GetBytes(
+            "TextFileProcessor.Spaceship.Build7.v1");
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1298 =====
+            "TextFileProcessor",
+            "spaceship-settings.json");
+
+    private static readonly byte[] SpaceshipEntropy =
+        Encoding.UTF8.GetBytes(
+            "TextFileProcessor.Spaceship.Build7.v1");
+
+    private sealed class SpaceshipRuntimeSettings
+    {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1300 =====
+
+    private static readonly byte[] SpaceshipEntropy =
+        Encoding.UTF8.GetBytes(
+            "TextFileProcessor.Spaceship.Build7.v1");
+
+    private sealed class SpaceshipRuntimeSettings
+    {
+        public string BaseUrl { get; init; } =
+            "https://spaceship.dev/api/v1";
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1302 =====
+        Encoding.UTF8.GetBytes(
+            "TextFileProcessor.Spaceship.Build7.v1");
+
+    private sealed class SpaceshipRuntimeSettings
+    {
+        public string BaseUrl { get; init; } =
+            "https://spaceship.dev/api/v1";
+
+        public string ApiKey { get; init; } = string.Empty;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1304 =====
+
+    private sealed class SpaceshipRuntimeSettings
+    {
+        public string BaseUrl { get; init; } =
+            "https://spaceship.dev/api/v1";
+
+        public string ApiKey { get; init; } = string.Empty;
+
+        public string ApiSecret { get; init; } = string.Empty;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1305 =====
+    private sealed class SpaceshipRuntimeSettings
+    {
+        public string BaseUrl { get; init; } =
+            "https://spaceship.dev/api/v1";
+
+        public string ApiKey { get; init; } = string.Empty;
+
+        public string ApiSecret { get; init; } = string.Empty;
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1315 =====
+            "dns/records/{domain}";
+    }
+
+    private sealed class SpaceshipStoredSettings
+    {
+        public string BaseUrl { get; set; } =
+            "https://spaceship.dev/api/v1";
+
+        public string ApiKey { get; set; } = string.Empty;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1317 =====
+
+    private sealed class SpaceshipStoredSettings
+    {
+        public string BaseUrl { get; set; } =
+            "https://spaceship.dev/api/v1";
+
+        public string ApiKey { get; set; } = string.Empty;
+
+        public string EncryptedSecret { get; set; } =
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1, строка 1318 =====
+    private sealed class SpaceshipStoredSettings
+    {
+        public string BaseUrl { get; set; } =
+            "https://spaceship.dev/api/v1";
+
+        public string ApiKey { get; set; } = string.Empty;
+
+        public string EncryptedSecret { get; set; } =
+            string.Empty;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1, строка 65 =====
+    )
+}
+
+function Add-SpaceshipPagination {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1, строка 80 =====
+        return
+    }
+
+    $pattern = '(?m)^(?<indent>[ \t]*)var baseUrl = settings\.BaseUrl\.TrimEnd\(''/''\);[ \t]*\r?\n[ \t]*var requestUrl = baseUrl \+ "/" \+ relativePath;[ \t]*$'
+
+    $regex = New-Object System.Text.RegularExpressions.Regex(
+        $pattern,
+        [System.Text.RegularExpressions.RegexOptions]::Multiline
+    )
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1, строка 91 =====
+
+    if ($matches.Count -ne 1) {
+        throw (
+            "Не удалось однозначно найти блок Spaceship в файле: $Path. " +
+            "Найдено совпадений: $($matches.Count)"
+        )
+    }
+
+    $evaluator = [System.Text.RegularExpressions.MatchEvaluator] {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1, строка 109 =====
+        }
+
+        return (
+            $indent + "var baseUrl = settings.BaseUrl.TrimEnd('/');" +
+            $newline +
+            $indent + 'var requestUrl = baseUrl + "/" + relativePath;' +
+            $newline +
+            $newline +
+            $indent + '// Spaceship API требует параметры пагинации.' +
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1, строка 111 =====
+        return (
+            $indent + "var baseUrl = settings.BaseUrl.TrimEnd('/');" +
+            $newline +
+            $indent + 'var requestUrl = baseUrl + "/" + relativePath;' +
+            $newline +
+            $newline +
+            $indent + '// Spaceship API требует параметры пагинации.' +
+            $newline +
+            $indent + 'var paginationSeparator =' +
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1, строка 114 =====
+            $indent + 'var requestUrl = baseUrl + "/" + relativePath;' +
+            $newline +
+            $newline +
+            $indent + '// Spaceship API требует параметры пагинации.' +
+            $newline +
+            $indent + 'var paginationSeparator =' +
+            $newline +
+            $indent + '    requestUrl.Contains(''?'') ? "&" : "?";' +
+            $newline +
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1, строка 118 =====
+            $newline +
+            $indent + 'var paginationSeparator =' +
+            $newline +
+            $indent + '    requestUrl.Contains(''?'') ? "&" : "?";' +
+            $newline +
+            $newline +
+            $indent + 'requestUrl +=' +
+            $newline +
+            $indent + '    paginationSeparator + "take=100&skip=0";'
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1, строка 121 =====
+            $indent + '    requestUrl.Contains(''?'') ? "&" : "?";' +
+            $newline +
+            $newline +
+            $indent + 'requestUrl +=' +
+            $newline +
+            $indent + '    paginationSeparator + "take=100&skip=0";'
+        )
+    }
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1, строка 147 =====
+        throw "Не удалось подтвердить исправление: $Path"
+    }
+
+    Write-Host "Исправлен Spaceship API: $Path" `
+        -ForegroundColor Green
+}
+
+function Fix-DatabaseDeployment {
+    param(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1, строка 406 =====
+    Write-Host "Резервная копия: $backupDirectory" `
+        -ForegroundColor Green
+
+    Write-Step 'Исправление Spaceship API'
+
+    Add-SpaceshipPagination -Path $MainWindowFile
+    Add-SpaceshipPagination -Path $Build7File
+
+    Write-Step 'Исправление создания базы данных'
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1, строка 408 =====
+
+    Write-Step 'Исправление Spaceship API'
+
+    Add-SpaceshipPagination -Path $MainWindowFile
+    Add-SpaceshipPagination -Path $Build7File
+
+    Write-Step 'Исправление создания базы данных'
+
+    Fix-DatabaseDeployment -Path $DatabaseFile
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1, строка 409 =====
+    Write-Step 'Исправление Spaceship API'
+
+    Add-SpaceshipPagination -Path $MainWindowFile
+    Add-SpaceshipPagination -Path $Build7File
+
+    Write-Step 'Исправление создания базы данных'
+
+    Fix-DatabaseDeployment -Path $DatabaseFile
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1, строка 523 =====
+    Write-Host 'Внесённые исправления:' `
+        -ForegroundColor Green
+
+    Write-Host '1. В запрос Spaceship добавлены take=100 и skip=0.'
+    Write-Host '2. Ошибка ISPmanager exists(name) больше не останавливает процесс.'
+    Write-Host '3. Подключение к базе проверяется до 20 раз.'
+    Write-Host '4. При ошибке отображается ответ клиента MySQL.'
+}
+catch {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 16 =====
+
+public partial class MainWindow
+{
+    private TextBox? _spaceshipBaseUrlTextBox;
+    private TextBox? _spaceshipKeyTextBox;
+    private PasswordBox? _spaceshipSecretPasswordBox;
+    private TextBox? _spaceshipDomainTextBox;
+    private TextBox? _spaceshipDnsPathTextBox;
+    private TextBlock? _spaceshipSecretStatus;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 17 =====
+public partial class MainWindow
+{
+    private TextBox? _spaceshipBaseUrlTextBox;
+    private TextBox? _spaceshipKeyTextBox;
+    private PasswordBox? _spaceshipSecretPasswordBox;
+    private TextBox? _spaceshipDomainTextBox;
+    private TextBox? _spaceshipDnsPathTextBox;
+    private TextBlock? _spaceshipSecretStatus;
+    private TextBlock? _build7Status;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 18 =====
+{
+    private TextBox? _spaceshipBaseUrlTextBox;
+    private TextBox? _spaceshipKeyTextBox;
+    private PasswordBox? _spaceshipSecretPasswordBox;
+    private TextBox? _spaceshipDomainTextBox;
+    private TextBox? _spaceshipDnsPathTextBox;
+    private TextBlock? _spaceshipSecretStatus;
+    private TextBlock? _build7Status;
+    private ProgressBar? _build7Progress;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 19 =====
+    private TextBox? _spaceshipBaseUrlTextBox;
+    private TextBox? _spaceshipKeyTextBox;
+    private PasswordBox? _spaceshipSecretPasswordBox;
+    private TextBox? _spaceshipDomainTextBox;
+    private TextBox? _spaceshipDnsPathTextBox;
+    private TextBlock? _spaceshipSecretStatus;
+    private TextBlock? _build7Status;
+    private ProgressBar? _build7Progress;
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 20 =====
+    private TextBox? _spaceshipKeyTextBox;
+    private PasswordBox? _spaceshipSecretPasswordBox;
+    private TextBox? _spaceshipDomainTextBox;
+    private TextBox? _spaceshipDnsPathTextBox;
+    private TextBlock? _spaceshipSecretStatus;
+    private TextBlock? _build7Status;
+    private ProgressBar? _build7Progress;
+
+    private Button? _build7LocalButton;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 21 =====
+    private PasswordBox? _spaceshipSecretPasswordBox;
+    private TextBox? _spaceshipDomainTextBox;
+    private TextBox? _spaceshipDnsPathTextBox;
+    private TextBlock? _spaceshipSecretStatus;
+    private TextBlock? _build7Status;
+    private ProgressBar? _build7Progress;
+
+    private Button? _build7LocalButton;
+    private Button? _build7DomainButton;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 29 =====
+    private Button? _build7DomainButton;
+    private Button? _build7UploadButton;
+    private Button? _build7DatabaseButton;
+    private Button? _build7SpaceshipButton;
+    private Button? _build7AllButton;
+
+    private readonly HttpClient _spaceshipHttpClient =
+        new()
+        {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 32 =====
+    private Button? _build7SpaceshipButton;
+    private Button? _build7AllButton;
+
+    private readonly HttpClient _spaceshipHttpClient =
+        new()
+        {
+            Timeout = TimeSpan.FromSeconds(45)
+        };
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 62 =====
+                .Any(item =>
+                    string.Equals(
+                        item.Header?.ToString(),
+                        "Процессы / Spaceship",
+                        StringComparison.Ordinal)))
+            {
+                return;
+            }
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 72 =====
+                0,
+                CreateBuild7Tab());
+
+            LoadSpaceshipSettings();
+
+            AddLog(
+                "INFO",
+                string.Empty,
+                "Сборка 7 загружена: раздельные процессы, " +
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 78 =====
+                "INFO",
+                string.Empty,
+                "Сборка 7 загружена: раздельные процессы, " +
+                "общий запуск и настройки Spaceship API.");
+        }
+        catch (Exception exception)
+        {
+            var message = SensitiveDataRedactor.Redact(
+                exception.Message);
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 186 =====
+                await WaitForLegacyOperationAsync();
+            });
+
+        _build7SpaceshipButton = CreateProcessButton(
+            "5. Проверить Spaceship",
+            190,
+            TestSpaceshipForSelectedJobAsync);
+
+        _build7AllButton = CreateProcessButton(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 187 =====
+            });
+
+        _build7SpaceshipButton = CreateProcessButton(
+            "5. Проверить Spaceship",
+            190,
+            TestSpaceshipForSelectedJobAsync);
+
+        _build7AllButton = CreateProcessButton(
+            "ЗАПУСТИТЬ ВСЕ ПРОЦЕССЫ",
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 189 =====
+        _build7SpaceshipButton = CreateProcessButton(
+            "5. Проверить Spaceship",
+            190,
+            TestSpaceshipForSelectedJobAsync);
+
+        _build7AllButton = CreateProcessButton(
+            "ЗАПУСТИТЬ ВСЕ ПРОЦЕССЫ",
+            245,
+            RunAllProcessesAsync);
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 206 =====
+        processPanel.Children.Add(_build7DomainButton);
+        processPanel.Children.Add(_build7UploadButton);
+        processPanel.Children.Add(_build7DatabaseButton);
+        processPanel.Children.Add(_build7SpaceshipButton);
+        processPanel.Children.Add(_build7AllButton);
+
+        processBox.Content = processPanel;
+
+        Grid.SetRow(processBox, 0);
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 216 =====
+
+        var apiBox = new GroupBox
+        {
+            Header = "Spaceship API",
+            Margin = new Thickness(0, 0, 0, 12)
+        };
+
+        var apiGrid = new Grid
+        {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 246 =====
+                });
+        }
+
+        _spaceshipBaseUrlTextBox = AddTextSetting(
+            apiGrid,
+            0,
+            "Base URL:",
+            "https://spaceship.dev/api/v1");
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 250 =====
+            apiGrid,
+            0,
+            "Base URL:",
+            "https://spaceship.dev/api/v1");
+
+        _spaceshipKeyTextBox = AddTextSetting(
+            apiGrid,
+            1,
+            "API Key:",
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 252 =====
+            "Base URL:",
+            "https://spaceship.dev/api/v1");
+
+        _spaceshipKeyTextBox = AddTextSetting(
+            apiGrid,
+            1,
+            "API Key:",
+            string.Empty);
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 258 =====
+            "API Key:",
+            string.Empty);
+
+        _spaceshipSecretPasswordBox =
+            new PasswordBox
+            {
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 269 =====
+            2,
+            "API Secret:");
+
+        Grid.SetRow(_spaceshipSecretPasswordBox, 2);
+        Grid.SetColumn(_spaceshipSecretPasswordBox, 1);
+        apiGrid.Children.Add(_spaceshipSecretPasswordBox);
+
+        _spaceshipSecretStatus = new TextBlock
+        {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 270 =====
+            "API Secret:");
+
+        Grid.SetRow(_spaceshipSecretPasswordBox, 2);
+        Grid.SetColumn(_spaceshipSecretPasswordBox, 1);
+        apiGrid.Children.Add(_spaceshipSecretPasswordBox);
+
+        _spaceshipSecretStatus = new TextBlock
+        {
+            Margin = new Thickness(0, 0, 0, 8),
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 271 =====
+
+        Grid.SetRow(_spaceshipSecretPasswordBox, 2);
+        Grid.SetColumn(_spaceshipSecretPasswordBox, 1);
+        apiGrid.Children.Add(_spaceshipSecretPasswordBox);
+
+        _spaceshipSecretStatus = new TextBlock
+        {
+            Margin = new Thickness(0, 0, 0, 8),
+            Foreground = Brushes.DimGray,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 273 =====
+        Grid.SetColumn(_spaceshipSecretPasswordBox, 1);
+        apiGrid.Children.Add(_spaceshipSecretPasswordBox);
+
+        _spaceshipSecretStatus = new TextBlock
+        {
+            Margin = new Thickness(0, 0, 0, 8),
+            Foreground = Brushes.DimGray,
+            Text = "API Secret ещё не сохранён."
+        };
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 280 =====
+            Text = "API Secret ещё не сохранён."
+        };
+
+        Grid.SetRow(_spaceshipSecretStatus, 3);
+        Grid.SetColumn(_spaceshipSecretStatus, 1);
+        apiGrid.Children.Add(_spaceshipSecretStatus);
+
+        _spaceshipDomainTextBox = AddTextSetting(
+            apiGrid,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 281 =====
+        };
+
+        Grid.SetRow(_spaceshipSecretStatus, 3);
+        Grid.SetColumn(_spaceshipSecretStatus, 1);
+        apiGrid.Children.Add(_spaceshipSecretStatus);
+
+        _spaceshipDomainTextBox = AddTextSetting(
+            apiGrid,
+            4,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 282 =====
+
+        Grid.SetRow(_spaceshipSecretStatus, 3);
+        Grid.SetColumn(_spaceshipSecretStatus, 1);
+        apiGrid.Children.Add(_spaceshipSecretStatus);
+
+        _spaceshipDomainTextBox = AddTextSetting(
+            apiGrid,
+            4,
+            "Домен для проверки:",
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 284 =====
+        Grid.SetColumn(_spaceshipSecretStatus, 1);
+        apiGrid.Children.Add(_spaceshipSecretStatus);
+
+        _spaceshipDomainTextBox = AddTextSetting(
+            apiGrid,
+            4,
+            "Домен для проверки:",
+            string.Empty);
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 290 =====
+            "Домен для проверки:",
+            string.Empty);
+
+        _spaceshipDnsPathTextBox = AddTextSetting(
+            apiGrid,
+            5,
+            "DNS path:",
+            "dns/records/{domain}");
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 303 =====
+
+        var saveButton = new Button
+        {
+            Content = "Сохранить Spaceship",
+            Width = 190,
+            Padding = new Thickness(10, 6, 10, 6),
+            Margin = new Thickness(0, 0, 8, 8)
+        };
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 313 =====
+        {
+            try
+            {
+                SaveSpaceshipSettings();
+
+                SetBuild7Status(
+                    0,
+                    "Настройки Spaceship сохранены. " +
+                    "API Secret защищён Windows DPAPI.");
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 317 =====
+
+                SetBuild7Status(
+                    0,
+                    "Настройки Spaceship сохранены. " +
+                    "API Secret защищён Windows DPAPI.");
+
+                AddLog(
+                    "INFO",
+                    string.Empty,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 323 =====
+                AddLog(
+                    "INFO",
+                    string.Empty,
+                    "Настройки Spaceship сохранены. " +
+                    "API Secret в журнал не записан.");
+            }
+            catch (Exception exception)
+            {
+                ShowBuild7Error(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 336 =====
+
+        var testButton = new Button
+        {
+            Content = "Проверить Spaceship API",
+            Width = 205,
+            Padding = new Thickness(10, 6, 10, 6),
+            Margin = new Thickness(0, 0, 8, 8)
+        };
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 344 =====
+
+        testButton.Click += async (_, _) =>
+            await ExecuteBuild7OperationAsync(
+                TestSpaceshipForSelectedJobAsync);
+
+        apiButtons.Children.Add(saveButton);
+        apiButtons.Children.Add(testButton);
+
+        Grid.SetRow(apiButtons, 6);
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 394 =====
+
+        return new TabItem
+        {
+            Header = "Процессы / Spaceship",
+            Content = new ScrollViewer
+            {
+                VerticalScrollBarVisibility =
+                    ScrollBarVisibility.Auto,
+                Content = root
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 476 =====
+            "2. Создание WWW-домена.\n" +
+            "3. Загрузка файлов.\n" +
+            "4. Создание БД и импорт SQL.\n" +
+            "5. Проверка доступа к DNS через Spaceship API.\n\n" +
+            "Текущие обработчики могут запросить дополнительное " +
+            "подтверждение опасных операций.",
+            "Полный процесс",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 568 =====
+                CalculateAllPercent(
+                    completedStages,
+                    totalStages),
+                $"{job.Domain}: проверка Spaceship DNS API.");
+
+            if (_spaceshipDomainTextBox is not null)
+            {
+                _spaceshipDomainTextBox.Text = job.Domain;
+            }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 570 =====
+                    totalStages),
+                $"{job.Domain}: проверка Spaceship DNS API.");
+
+            if (_spaceshipDomainTextBox is not null)
+            {
+                _spaceshipDomainTextBox.Text = job.Domain;
+            }
+
+            await TestSpaceshipAsync(job.Domain);
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 572 =====
+
+            if (_spaceshipDomainTextBox is not null)
+            {
+                _spaceshipDomainTextBox.Text = job.Domain;
+            }
+
+            await TestSpaceshipAsync(job.Domain);
+            completedStages++;
+        }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 575 =====
+                _spaceshipDomainTextBox.Text = job.Domain;
+            }
+
+            await TestSpaceshipAsync(job.Domain);
+            completedStages++;
+        }
+
+        SetBuild7Status(
+            100,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 626 =====
+            99);
+    }
+
+    private async Task TestSpaceshipForSelectedJobAsync()
+    {
+        var domain =
+            _spaceshipDomainTextBox?.Text.Trim();
+
+        if (string.IsNullOrWhiteSpace(domain))
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 629 =====
+    private async Task TestSpaceshipForSelectedJobAsync()
+    {
+        var domain =
+            _spaceshipDomainTextBox?.Text.Trim();
+
+        if (string.IsNullOrWhiteSpace(domain))
+        {
+            domain = GetSelectedJob()?.Domain;
+        }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 639 =====
+        if (string.IsNullOrWhiteSpace(domain))
+        {
+            throw new InvalidOperationException(
+                "Укажите домен Spaceship или выберите задание.");
+        }
+
+        await TestSpaceshipAsync(domain);
+    }
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 642 =====
+                "Укажите домен Spaceship или выберите задание.");
+        }
+
+        await TestSpaceshipAsync(domain);
+    }
+
+    private async Task TestSpaceshipAsync(string domain)
+    {
+        var settings = ReadSpaceshipSettings();
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 645 =====
+        await TestSpaceshipAsync(domain);
+    }
+
+    private async Task TestSpaceshipAsync(string domain)
+    {
+        var settings = ReadSpaceshipSettings();
+
+        if (string.IsNullOrWhiteSpace(settings.ApiSecret))
+        {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 647 =====
+
+    private async Task TestSpaceshipAsync(string domain)
+    {
+        var settings = ReadSpaceshipSettings();
+
+        if (string.IsNullOrWhiteSpace(settings.ApiSecret))
+        {
+            throw new InvalidOperationException(
+                "Введите или сохраните Spaceship API Secret.");
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 652 =====
+        if (string.IsNullOrWhiteSpace(settings.ApiSecret))
+        {
+            throw new InvalidOperationException(
+                "Введите или сохраните Spaceship API Secret.");
+        }
+
+        SaveSpaceshipSettings();
+
+        var relativePath = settings.DnsPath
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 655 =====
+                "Введите или сохраните Spaceship API Secret.");
+        }
+
+        SaveSpaceshipSettings();
+
+        var relativePath = settings.DnsPath
+            .Replace(
+                "{domain}",
+                Uri.EscapeDataString(domain),
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 657 =====
+
+        SaveSpaceshipSettings();
+
+        var relativePath = settings.DnsPath
+            .Replace(
+                "{domain}",
+                Uri.EscapeDataString(domain),
+                StringComparison.OrdinalIgnoreCase)
+            .TrimStart('/');
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 664 =====
+                StringComparison.OrdinalIgnoreCase)
+            .TrimStart('/');
+
+        var baseUrl = settings.BaseUrl.TrimEnd('/');
+        var requestUrl = baseUrl + "/" + relativePath;
+
+        SetBuild7Status(
+            _build7Progress?.Value ?? 0,
+            $"Spaceship API: чтение DNS-зоны {domain}.");
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 665 =====
+            .TrimStart('/');
+
+        var baseUrl = settings.BaseUrl.TrimEnd('/');
+        var requestUrl = baseUrl + "/" + relativePath;
+
+        SetBuild7Status(
+            _build7Progress?.Value ?? 0,
+            $"Spaceship API: чтение DNS-зоны {domain}.");
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 669 =====
+
+        SetBuild7Status(
+            _build7Progress?.Value ?? 0,
+            $"Spaceship API: чтение DNS-зоны {domain}.");
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            requestUrl);
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 673 =====
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            requestUrl);
+
+        request.Headers.TryAddWithoutValidation(
+            "X-API-Key",
+            settings.ApiKey);
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 684 =====
+            settings.ApiSecret);
+
+        using var response =
+            await _spaceshipHttpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead);
+
+        var body = await response.Content.ReadAsStringAsync();
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 698 =====
+                settings.ApiSecret);
+
+            throw new InvalidOperationException(
+                $"Spaceship API вернул HTTP " +
+                $"{(int)response.StatusCode} " +
+                $"{response.ReasonPhrase}. {safeBody}");
+        }
+
+        var resultDescription = DescribeJson(body);
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 709 =====
+            Math.Max(
+                1,
+                (int)(_build7Progress?.Value ?? 0)),
+            $"Spaceship API доступен. Домен: {domain}. " +
+            resultDescription);
+
+        AddLog(
+            "INFO",
+            domain,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 715 =====
+        AddLog(
+            "INFO",
+            domain,
+            "Spaceship API: DNS-зона успешно прочитана.");
+    }
+
+    private SpaceshipRuntimeSettings ReadSpaceshipSettings()
+    {
+        if (_spaceshipBaseUrlTextBox is null ||
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 718 =====
+            "Spaceship API: DNS-зона успешно прочитана.");
+    }
+
+    private SpaceshipRuntimeSettings ReadSpaceshipSettings()
+    {
+        if (_spaceshipBaseUrlTextBox is null ||
+            _spaceshipKeyTextBox is null ||
+            _spaceshipSecretPasswordBox is null ||
+            _spaceshipDnsPathTextBox is null)
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 720 =====
+
+    private SpaceshipRuntimeSettings ReadSpaceshipSettings()
+    {
+        if (_spaceshipBaseUrlTextBox is null ||
+            _spaceshipKeyTextBox is null ||
+            _spaceshipSecretPasswordBox is null ||
+            _spaceshipDnsPathTextBox is null)
+        {
+            throw new InvalidOperationException(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 721 =====
+    private SpaceshipRuntimeSettings ReadSpaceshipSettings()
+    {
+        if (_spaceshipBaseUrlTextBox is null ||
+            _spaceshipKeyTextBox is null ||
+            _spaceshipSecretPasswordBox is null ||
+            _spaceshipDnsPathTextBox is null)
+        {
+            throw new InvalidOperationException(
+                "Интерфейс Spaceship не инициализирован.");
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 722 =====
+    {
+        if (_spaceshipBaseUrlTextBox is null ||
+            _spaceshipKeyTextBox is null ||
+            _spaceshipSecretPasswordBox is null ||
+            _spaceshipDnsPathTextBox is null)
+        {
+            throw new InvalidOperationException(
+                "Интерфейс Spaceship не инициализирован.");
+        }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 723 =====
+        if (_spaceshipBaseUrlTextBox is null ||
+            _spaceshipKeyTextBox is null ||
+            _spaceshipSecretPasswordBox is null ||
+            _spaceshipDnsPathTextBox is null)
+        {
+            throw new InvalidOperationException(
+                "Интерфейс Spaceship не инициализирован.");
+        }
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 726 =====
+            _spaceshipDnsPathTextBox is null)
+        {
+            throw new InvalidOperationException(
+                "Интерфейс Spaceship не инициализирован.");
+        }
+
+        var stored = LoadSpaceshipSettingsFile();
+
+        var secret =
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 729 =====
+                "Интерфейс Spaceship не инициализирован.");
+        }
+
+        var stored = LoadSpaceshipSettingsFile();
+
+        var secret =
+            _spaceshipSecretPasswordBox.Password;
+
+        if (string.IsNullOrEmpty(secret) &&
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 732 =====
+        var stored = LoadSpaceshipSettingsFile();
+
+        var secret =
+            _spaceshipSecretPasswordBox.Password;
+
+        if (string.IsNullOrEmpty(secret) &&
+            !string.IsNullOrWhiteSpace(stored.EncryptedSecret))
+        {
+            secret = UnprotectSecret(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 741 =====
+                stored.EncryptedSecret);
+        }
+
+        var settings = new SpaceshipRuntimeSettings
+        {
+            BaseUrl = _spaceshipBaseUrlTextBox.Text.Trim(),
+            ApiKey = _spaceshipKeyTextBox.Text.Trim(),
+            ApiSecret = secret,
+            DnsPath = _spaceshipDnsPathTextBox.Text.Trim()
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 743 =====
+
+        var settings = new SpaceshipRuntimeSettings
+        {
+            BaseUrl = _spaceshipBaseUrlTextBox.Text.Trim(),
+            ApiKey = _spaceshipKeyTextBox.Text.Trim(),
+            ApiSecret = secret,
+            DnsPath = _spaceshipDnsPathTextBox.Text.Trim()
+        };
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 744 =====
+        var settings = new SpaceshipRuntimeSettings
+        {
+            BaseUrl = _spaceshipBaseUrlTextBox.Text.Trim(),
+            ApiKey = _spaceshipKeyTextBox.Text.Trim(),
+            ApiSecret = secret,
+            DnsPath = _spaceshipDnsPathTextBox.Text.Trim()
+        };
+
+        if (!Uri.TryCreate(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 746 =====
+            BaseUrl = _spaceshipBaseUrlTextBox.Text.Trim(),
+            ApiKey = _spaceshipKeyTextBox.Text.Trim(),
+            ApiSecret = secret,
+            DnsPath = _spaceshipDnsPathTextBox.Text.Trim()
+        };
+
+        if (!Uri.TryCreate(
+                settings.BaseUrl,
+                UriKind.Absolute,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 750 =====
+        };
+
+        if (!Uri.TryCreate(
+                settings.BaseUrl,
+                UriKind.Absolute,
+                out var uri) ||
+            uri.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 756 =====
+            uri.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException(
+                "Spaceship Base URL должен быть абсолютным HTTPS URL.");
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+        {
+            throw new InvalidOperationException(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 762 =====
+        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+        {
+            throw new InvalidOperationException(
+                "Не указан Spaceship API Key.");
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.DnsPath) ||
+            !settings.DnsPath.Contains(
+                "{domain}",
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 777 =====
+        return settings;
+    }
+
+    private void SaveSpaceshipSettings()
+    {
+        var settings = ReadSpaceshipSettings();
+
+        var stored = new SpaceshipStoredSettings
+        {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 779 =====
+
+    private void SaveSpaceshipSettings()
+    {
+        var settings = ReadSpaceshipSettings();
+
+        var stored = new SpaceshipStoredSettings
+        {
+            BaseUrl = settings.BaseUrl,
+            ApiKey = settings.ApiKey,
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 781 =====
+    {
+        var settings = ReadSpaceshipSettings();
+
+        var stored = new SpaceshipStoredSettings
+        {
+            BaseUrl = settings.BaseUrl,
+            ApiKey = settings.ApiKey,
+            DnsPath = settings.DnsPath,
+            EncryptedSecret = ProtectSecret(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 783 =====
+
+        var stored = new SpaceshipStoredSettings
+        {
+            BaseUrl = settings.BaseUrl,
+            ApiKey = settings.ApiKey,
+            DnsPath = settings.DnsPath,
+            EncryptedSecret = ProtectSecret(
+                settings.ApiSecret)
+        };
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 791 =====
+        };
+
+        var directory = Path.GetDirectoryName(
+            SpaceshipSettingsPath);
+
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            throw new InvalidOperationException(
+                "Не удалось определить папку настроек.");
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 802 =====
+        Directory.CreateDirectory(directory);
+
+        var temporaryPath =
+            SpaceshipSettingsPath + ".tmp";
+
+        var json = JsonSerializer.Serialize(
+            stored,
+            new JsonSerializerOptions
+            {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 818 =====
+
+        File.Move(
+            temporaryPath,
+            SpaceshipSettingsPath,
+            true);
+
+        _spaceshipSecretPasswordBox?.Clear();
+
+        if (_spaceshipSecretStatus is not null)
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 821 =====
+            SpaceshipSettingsPath,
+            true);
+
+        _spaceshipSecretPasswordBox?.Clear();
+
+        if (_spaceshipSecretStatus is not null)
+        {
+            _spaceshipSecretStatus.Text =
+                "API Secret сохранён и защищён Windows DPAPI.";
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 823 =====
+
+        _spaceshipSecretPasswordBox?.Clear();
+
+        if (_spaceshipSecretStatus is not null)
+        {
+            _spaceshipSecretStatus.Text =
+                "API Secret сохранён и защищён Windows DPAPI.";
+        }
+    }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 825 =====
+
+        if (_spaceshipSecretStatus is not null)
+        {
+            _spaceshipSecretStatus.Text =
+                "API Secret сохранён и защищён Windows DPAPI.";
+        }
+    }
+
+    private void LoadSpaceshipSettings()
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 830 =====
+        }
+    }
+
+    private void LoadSpaceshipSettings()
+    {
+        var stored = LoadSpaceshipSettingsFile();
+
+        if (_spaceshipBaseUrlTextBox is not null)
+        {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 832 =====
+
+    private void LoadSpaceshipSettings()
+    {
+        var stored = LoadSpaceshipSettingsFile();
+
+        if (_spaceshipBaseUrlTextBox is not null)
+        {
+            _spaceshipBaseUrlTextBox.Text =
+                string.IsNullOrWhiteSpace(stored.BaseUrl)
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 834 =====
+    {
+        var stored = LoadSpaceshipSettingsFile();
+
+        if (_spaceshipBaseUrlTextBox is not null)
+        {
+            _spaceshipBaseUrlTextBox.Text =
+                string.IsNullOrWhiteSpace(stored.BaseUrl)
+                    ? "https://spaceship.dev/api/v1"
+                    : stored.BaseUrl;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 836 =====
+
+        if (_spaceshipBaseUrlTextBox is not null)
+        {
+            _spaceshipBaseUrlTextBox.Text =
+                string.IsNullOrWhiteSpace(stored.BaseUrl)
+                    ? "https://spaceship.dev/api/v1"
+                    : stored.BaseUrl;
+        }
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 837 =====
+        if (_spaceshipBaseUrlTextBox is not null)
+        {
+            _spaceshipBaseUrlTextBox.Text =
+                string.IsNullOrWhiteSpace(stored.BaseUrl)
+                    ? "https://spaceship.dev/api/v1"
+                    : stored.BaseUrl;
+        }
+
+        if (_spaceshipKeyTextBox is not null)
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 838 =====
+        {
+            _spaceshipBaseUrlTextBox.Text =
+                string.IsNullOrWhiteSpace(stored.BaseUrl)
+                    ? "https://spaceship.dev/api/v1"
+                    : stored.BaseUrl;
+        }
+
+        if (_spaceshipKeyTextBox is not null)
+        {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 839 =====
+            _spaceshipBaseUrlTextBox.Text =
+                string.IsNullOrWhiteSpace(stored.BaseUrl)
+                    ? "https://spaceship.dev/api/v1"
+                    : stored.BaseUrl;
+        }
+
+        if (_spaceshipKeyTextBox is not null)
+        {
+            _spaceshipKeyTextBox.Text = stored.ApiKey;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 842 =====
+                    : stored.BaseUrl;
+        }
+
+        if (_spaceshipKeyTextBox is not null)
+        {
+            _spaceshipKeyTextBox.Text = stored.ApiKey;
+        }
+
+        if (_spaceshipDnsPathTextBox is not null)
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 844 =====
+
+        if (_spaceshipKeyTextBox is not null)
+        {
+            _spaceshipKeyTextBox.Text = stored.ApiKey;
+        }
+
+        if (_spaceshipDnsPathTextBox is not null)
+        {
+            _spaceshipDnsPathTextBox.Text =
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 847 =====
+            _spaceshipKeyTextBox.Text = stored.ApiKey;
+        }
+
+        if (_spaceshipDnsPathTextBox is not null)
+        {
+            _spaceshipDnsPathTextBox.Text =
+                string.IsNullOrWhiteSpace(stored.DnsPath)
+                    ? "dns/records/{domain}"
+                    : stored.DnsPath;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 849 =====
+
+        if (_spaceshipDnsPathTextBox is not null)
+        {
+            _spaceshipDnsPathTextBox.Text =
+                string.IsNullOrWhiteSpace(stored.DnsPath)
+                    ? "dns/records/{domain}"
+                    : stored.DnsPath;
+        }
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 855 =====
+                    : stored.DnsPath;
+        }
+
+        if (_spaceshipSecretStatus is not null)
+        {
+            _spaceshipSecretStatus.Text =
+                string.IsNullOrWhiteSpace(stored.EncryptedSecret)
+                    ? "API Secret ещё не сохранён."
+                    : "Зашифрованный API Secret сохранён.";
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 857 =====
+
+        if (_spaceshipSecretStatus is not null)
+        {
+            _spaceshipSecretStatus.Text =
+                string.IsNullOrWhiteSpace(stored.EncryptedSecret)
+                    ? "API Secret ещё не сохранён."
+                    : "Зашифрованный API Secret сохранён.";
+        }
+    }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 864 =====
+        }
+    }
+
+    private SpaceshipStoredSettings LoadSpaceshipSettingsFile()
+    {
+        if (!File.Exists(SpaceshipSettingsPath))
+        {
+            return new SpaceshipStoredSettings();
+        }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 866 =====
+
+    private SpaceshipStoredSettings LoadSpaceshipSettingsFile()
+    {
+        if (!File.Exists(SpaceshipSettingsPath))
+        {
+            return new SpaceshipStoredSettings();
+        }
+
+        try
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 868 =====
+    {
+        if (!File.Exists(SpaceshipSettingsPath))
+        {
+            return new SpaceshipStoredSettings();
+        }
+
+        try
+        {
+            var json = File.ReadAllText(
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 874 =====
+        try
+        {
+            var json = File.ReadAllText(
+                SpaceshipSettingsPath,
+                Encoding.UTF8);
+
+            return JsonSerializer.Deserialize<
+                       SpaceshipStoredSettings>(json) ??
+                   new SpaceshipStoredSettings();
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 878 =====
+                Encoding.UTF8);
+
+            return JsonSerializer.Deserialize<
+                       SpaceshipStoredSettings>(json) ??
+                   new SpaceshipStoredSettings();
+        }
+        catch
+        {
+            return new SpaceshipStoredSettings();
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 879 =====
+
+            return JsonSerializer.Deserialize<
+                       SpaceshipStoredSettings>(json) ??
+                   new SpaceshipStoredSettings();
+        }
+        catch
+        {
+            return new SpaceshipStoredSettings();
+        }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 883 =====
+        }
+        catch
+        {
+            return new SpaceshipStoredSettings();
+        }
+    }
+
+    private static string ProtectSecret(string value)
+    {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 900 =====
+        {
+            var encrypted = ProtectedData.Protect(
+                plainBytes,
+                SpaceshipEntropy,
+                DataProtectionScope.CurrentUser);
+
+            return Convert.ToBase64String(encrypted);
+        }
+        finally
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 916 =====
+        var encrypted = Convert.FromBase64String(value);
+        var plainBytes = ProtectedData.Unprotect(
+            encrypted,
+            SpaceshipEntropy,
+            DataProtectionScope.CurrentUser);
+
+        try
+        {
+            return Encoding.UTF8.GetString(plainBytes);
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 1032 =====
+        if (_build7DatabaseButton is not null)
+            _build7DatabaseButton.IsEnabled = enabled;
+
+        if (_build7SpaceshipButton is not null)
+            _build7SpaceshipButton.IsEnabled = enabled;
+
+        if (_build7AllButton is not null)
+            _build7AllButton.IsEnabled = enabled;
+    }
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 1033 =====
+            _build7DatabaseButton.IsEnabled = enabled;
+
+        if (_build7SpaceshipButton is not null)
+            _build7SpaceshipButton.IsEnabled = enabled;
+
+        if (_build7AllButton is not null)
+            _build7AllButton.IsEnabled = enabled;
+    }
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 1129 =====
+        return null;
+    }
+
+    private static string SpaceshipSettingsPath =>
+        Path.Combine(
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.LocalApplicationData),
+            "TextFileProcessor",
+            "spaceship-settings.json");
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 1134 =====
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.LocalApplicationData),
+            "TextFileProcessor",
+            "spaceship-settings.json");
+
+    private static readonly byte[] SpaceshipEntropy =
+        Encoding.UTF8.GetBytes(
+            "TextFileProcessor.Spaceship.Build7.v1");
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 1136 =====
+            "TextFileProcessor",
+            "spaceship-settings.json");
+
+    private static readonly byte[] SpaceshipEntropy =
+        Encoding.UTF8.GetBytes(
+            "TextFileProcessor.Spaceship.Build7.v1");
+
+    private sealed class SpaceshipRuntimeSettings
+    {
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 1138 =====
+
+    private static readonly byte[] SpaceshipEntropy =
+        Encoding.UTF8.GetBytes(
+            "TextFileProcessor.Spaceship.Build7.v1");
+
+    private sealed class SpaceshipRuntimeSettings
+    {
+        public string BaseUrl { get; init; } =
+            "https://spaceship.dev/api/v1";
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 1140 =====
+        Encoding.UTF8.GetBytes(
+            "TextFileProcessor.Spaceship.Build7.v1");
+
+    private sealed class SpaceshipRuntimeSettings
+    {
+        public string BaseUrl { get; init; } =
+            "https://spaceship.dev/api/v1";
+
+        public string ApiKey { get; init; } = string.Empty;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 1142 =====
+
+    private sealed class SpaceshipRuntimeSettings
+    {
+        public string BaseUrl { get; init; } =
+            "https://spaceship.dev/api/v1";
+
+        public string ApiKey { get; init; } = string.Empty;
+
+        public string ApiSecret { get; init; } = string.Empty;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 1143 =====
+    private sealed class SpaceshipRuntimeSettings
+    {
+        public string BaseUrl { get; init; } =
+            "https://spaceship.dev/api/v1";
+
+        public string ApiKey { get; init; } = string.Empty;
+
+        public string ApiSecret { get; init; } = string.Empty;
+
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 1153 =====
+            "dns/records/{domain}";
+    }
+
+    private sealed class SpaceshipStoredSettings
+    {
+        public string BaseUrl { get; set; } =
+            "https://spaceship.dev/api/v1";
+
+        public string ApiKey { get; set; } = string.Empty;
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 1155 =====
+
+    private sealed class SpaceshipStoredSettings
+    {
+        public string BaseUrl { get; set; } =
+            "https://spaceship.dev/api/v1";
+
+        public string ApiKey { get; set; } = string.Empty;
+
+        public string EncryptedSecret { get; set; } =
+
+===== C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs, строка 1156 =====
+    private sealed class SpaceshipStoredSettings
+    {
+        public string BaseUrl { get; set; } =
+            "https://spaceship.dev/api/v1";
+
+        public string ApiKey { get; set; } = string.Empty;
+
+        public string EncryptedSecret { get; set; } =
+            string.Empty;
