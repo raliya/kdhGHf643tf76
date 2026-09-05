@@ -1,0 +1,17 @@
+bin/
+obj/
+.vs/
+Publish/
+Logs/
+AppData/
+*.user
+*.suo
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.log
+secrets.json
+appsettings.local.json
+auth.json
+storage-state.json
