@@ -1,0 +1,4515 @@
+Получил ответ от инструмента
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+Размышление
+
+
+
+
+
+
+
+Понял. Репозиторий используем как образец, а рабочий проект собираем локально в:
+
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка
+
+Ниже — PowerShell-строитель. Он:
+
+создаёт резервную копию исходников;
+исправляет повреждённые регулярные выражения БД;
+исправляет передачу пароля в mgrctl;
+добавляет вкладку «Процессы / Spaceship»;
+добавляет поля Spaceship API Key и API Secret;
+хранит API Secret через Windows DPAPI;
+добавляет проверку Spaceship API;
+добавляет отдельные кнопки локальной обработки, WWW-домена, загрузки и БД;
+добавляет общую последовательную кнопку;
+выполняет restore, build и publish win-x64.
+Скрипт не содержит ваших ключей. Ключ и секрет вводятся уже в интерфейсе программы.
+
+1. Создайте файл BUILD7.ps1
+Сохраните следующий код в:
+
+C:\Users\User\Desktop\Adminki\. Программа домены\BUILD7.ps1
+
+#requires -Version 7.0
+
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+
+$ProjectRoot = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$ProjectFile = Join-Path $ProjectRoot 'TextFileProcessor.csproj'
+$MainWindowFile = Join-Path $ProjectRoot 'MainWindow.xaml.cs'
+$DatabaseServiceFile = Join-Path $ProjectRoot 'Services\DatabaseDeploymentService.cs'
+$Build7File = Join-Path $ProjectRoot 'MainWindow.Build7.cs'
+$PublishDirectory = Join-Path $ProjectRoot 'publish\win-x64'
+
+function Write-Step {
+ param([string]$Text)
+ Write-Host "`n=== $Text ===" -ForegroundColor Cyan
+}
+
+function Assert-File {
+ param([string]$Path)
+
+ if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+ throw "Файл не найден: $Path"
+ }
+}
+
+Write-Step 'Проверка проекта'
+
+Assert-File $ProjectFile
+Assert-File $MainWindowFile
+Assert-File $DatabaseServiceFile
+
+$dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+if ($null -eq $dotnet) {
+ throw 'Не найден dotnet. Установите .NET 8 SDK x64.'
+}
+
+$versionText = (& dotnet --version).Trim()
+Write-Host ".NET SDK: $versionText"
+
+if (-not $versionText.StartsWith('8.')) {
+ Write-Warning "Проект рассчитан на .NET 8. Найдена версия SDK: $versionText"
+}
+
+Write-Step 'Создание резервной копии'
+
+$timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$backupRoot = Join-Path $ProjectRoot ".build7-backup-$timestamp"
+
+New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $backupRoot 'Services') -Force | Out-Null
+
+Copy-Item -LiteralPath $MainWindowFile `
+ -Destination (Join-Path $backupRoot 'MainWindow.xaml.cs')
+
+Copy-Item -LiteralPath $DatabaseServiceFile `
+ -Destination (Join-Path $backupRoot 'Services\DatabaseDeploymentService.cs')
+
+if (Test-Path -LiteralPath $Build7File) {
+ Copy-Item -LiteralPath $Build7File `
+ -Destination (Join-Path $backupRoot 'MainWindow.Build7.cs')
+}
+
+Write-Host "Резервная копия: $backupRoot"
+
+Write-Step 'Исправление DatabaseDeploymentService'
+
+$databaseText = Get-Content `
+ -LiteralPath $DatabaseServiceFile `
+ -Raw `
+ -Encoding UTF8
+
+$namePattern = @'
+private static readonly Regex DatabaseNameRegex\s*=\s*new\([\s\S]*?RegexOptions\.CultureInvariant\);
+'@
+
+$nameReplacement = @'
+private static readonly Regex DatabaseNameRegex = new(
+ @"^[A-Za-z0-9_]{1,64}$",
+ RegexOptions.Compiled |
+ RegexOptions.CultureInvariant);
+'@
+
+$userPattern = @'
+private static readonly Regex DatabaseUserRegex\s*=\s*new\([\s\S]*?RegexOptions\.CultureInvariant\);
+'@
+
+$userReplacement = @'
+private static readonly Regex DatabaseUserRegex = new(
+ @"^[A-Za-z0-9_]{1,64}$",
+ RegexOptions.Compiled |
+ RegexOptions.CultureInvariant);
+'@
+
+$databaseText = [regex]::Replace(
+ $databaseText,
+ $namePattern,
+ $nameReplacement,
+ [System.Text.RegularExpressions.RegexOptions]::Singleline)
+
+$databaseText = [regex]::Replace(
+ $databaseText,
+ $userPattern,
+ $userReplacement,
+ [System.Text.RegularExpressions.RegexOptions]::Singleline)
+
+# В старой реализации одинарные кавычки запрещали оболочке раскрыть
+# $DB_PASSWORD. В ISPmanager передавалась буквальная строка
+# "$DB_PASSWORD", а не реальный пароль.
+$databaseText = $databaseText.Replace(
+ "-e 'password=`$DB_PASSWORD' \",
+ 'password="$DB_PASSWORD" \')
+
+$databaseText = $databaseText.Replace(
+ "-e 'confirm=`$DB_PASSWORD' \",
+ 'confirm="$DB_PASSWORD" \')
+
+# На случай, если в локальном файле строки уже немного отличаются.
+$databaseText = $databaseText.Replace(
+ "'password=`$DB_PASSWORD'",
+ '"password=$DB_PASSWORD"')
+
+$databaseText = $databaseText.Replace(
+ "'confirm=`$DB_PASSWORD'",
+ '"confirm=$DB_PASSWORD"')
+
+Set-Content `
+ -LiteralPath $DatabaseServiceFile `
+ -Value $databaseText `
+ -Encoding UTF8
+
+Write-Host 'Исправлены валидация имени БД и передача пароля в mgrctl.'
+
+Write-Step 'Подключение Сборки 7'
+
+$mainWindowText = Get-Content `
+ -LiteralPath $MainWindowFile `
+ -Raw `
+ -Encoding UTF8
+
+if ($mainWindowText -notmatch 'InitializeBuild7\s*\(') {
+ if ($mainWindowText -match 'InitializeBuild6\s*\(\s*\)\s*;') {
+ $mainWindowText = [regex]::Replace(
+ $mainWindowText,
+ 'InitializeBuild6\s*\(\s*\)\s*;',
+ "InitializeBuild6();`r`n InitializeBuild7();",
+ 1)
+ }
+ else {
+ $mainWindowText = $mainWindowText.Replace(
+ 'InitializeComponent();',
+ "InitializeComponent();`r`n InitializeBuild7();")
+ }
+
+ Set-Content `
+ -LiteralPath $MainWindowFile `
+ -Value $mainWindowText `
+ -Encoding UTF8
+}
+
+Write-Step 'Создание MainWindow.Build7.cs'
+
+$build7Source = @'
+using System.Net;
+using System.Net.Http;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using TextFileProcessor.Models;
+using TextFileProcessor.Services;
+
+namespace TextFileProcessor;
+
+public partial class MainWindow
+{
+ private TextBox? _spaceshipBaseUrlTextBox;
+ private TextBox? _spaceshipKeyTextBox;
+ private PasswordBox? _spaceshipSecretPasswordBox;
+ private TextBox? _spaceshipDomainTextBox;
+ private TextBox? _spaceshipDnsPathTextBox;
+ private TextBlock? _spaceshipSecretStatus;
+ private TextBlock? _build7Status;
+ private ProgressBar? _build7Progress;
+
+ private Button? _build7LocalButton;
+ private Button? _build7DomainButton;
+ private Button? _build7UploadButton;
+ private Button? _build7DatabaseButton;
+ private Button? _build7SpaceshipButton;
+ private Button? _build7AllButton;
+
+ private readonly HttpClient _spaceshipHttpClient =
+ new()
+ {
+ Timeout = TimeSpan.FromSeconds(45)
+ };
+
+ private void InitializeBuild7()
+ {
+ Loaded += Build7_Loaded;
+ }
+
+ private void Build7_Loaded(
+ object sender,
+ RoutedEventArgs eventArgs)
+ {
+ try
+ {
+ var tabControl = FindVisualChild<TabControl>(this);
+
+ if (tabControl is null)
+ {
+ throw new InvalidOperationException(
+ "Не найден основной TabControl.");
+ }
+
+ if (tabControl.Items
+ .OfType<TabItem>()
+ .Any(item =>
+ string.Equals(
+ item.Header?.ToString(),
+ "Процессы / Spaceship",
+ StringComparison.Ordinal)))
+ {
+ return;
+ }
+
+ tabControl.Items.Insert(
+ 0,
+ CreateBuild7Tab());
+
+ LoadSpaceshipSettings();
+
+ AddLog(
+ "INFO",
+ string.Empty,
+ "Сборка 7 загружена: раздельные процессы, " +
+ "общий запуск и настройки Spaceship API.");
+ }
+ catch (Exception exception)
+ {
+ var message = SensitiveDataRedactor.Redact(
+ exception.Message);
+
+ SetStatus("Ошибка Сборки 7: " + message);
+ AddLog("ERROR", string.Empty, message);
+ }
+ }
+
+ private TabItem CreateBuild7Tab()
+ {
+ var root = new Grid
+ {
+ Margin = new Thickness(14)
+ };
+
+ root.RowDefinitions.Add(
+ new RowDefinition
+ {
+ Height = GridLength.Auto
+ });
+
+ root.RowDefinitions.Add(
+ new RowDefinition
+ {
+ Height = GridLength.Auto
+ });
+
+ root.RowDefinitions.Add(
+ new RowDefinition
+ {
+ Height = GridLength.Auto
+ });
+
+ root.RowDefinitions.Add(
+ new RowDefinition
+ {
+ Height = GridLength.Auto
+ });
+
+ root.RowDefinitions.Add(
+ new RowDefinition
+ {
+ Height = new GridLength(1, GridUnitType.Star)
+ });
+
+ var processBox = new GroupBox
+ {
+ Header = "Раздельный и общий запуск процессов",
+ Margin = new Thickness(0, 0, 0, 12)
+ };
+
+ var processPanel = new WrapPanel
+ {
+ Margin = new Thickness(10)
+ };
+
+ _build7LocalButton = CreateProcessButton(
+ "1. Локальная обработка",
+ 185,
+ async () =>
+ {
+ Start_Click(this, new RoutedEventArgs());
+ await WaitForLegacyOperationAsync();
+ });
+
+ _build7DomainButton = CreateProcessButton(
+ "2. Создать WWW-домен",
+ 190,
+ async () =>
+ {
+ EnsureSelectedJob();
+ CreateSelectedWebDomain_Click(
+ this,
+ new RoutedEventArgs());
+
+ await WaitForLegacyOperationAsync();
+ });
+
+ _build7UploadButton = CreateProcessButton(
+ "3. Загрузить файлы",
+ 175,
+ async () =>
+ {
+ EnsureSelectedJob();
+ DeploySelectedSite_Click(
+ this,
+ new RoutedEventArgs());
+
+ await WaitForLegacyOperationAsync();
+ });
+
+ _build7DatabaseButton = CreateProcessButton(
+ "4. Создать БД + SQL",
+ 185,
+ async () =>
+ {
+ EnsureSelectedJob();
+ DeployDatabaseButton_Click(
+ this,
+ new RoutedEventArgs());
+
+ await WaitForLegacyOperationAsync();
+ });
+
+ _build7SpaceshipButton = CreateProcessButton(
+ "5. Проверить Spaceship",
+ 190,
+ TestSpaceshipForSelectedJobAsync);
+
+ _build7AllButton = CreateProcessButton(
+ "ЗАПУСТИТЬ ВСЕ ПРОЦЕССЫ",
+ 245,
+ RunAllProcessesAsync);
+
+ _build7AllButton.Background =
+ new SolidColorBrush(Color.FromRgb(31, 122, 63));
+
+ _build7AllButton.Foreground = Brushes.White;
+ _build7AllButton.FontWeight = FontWeights.Bold;
+
+ processPanel.Children.Add(_build7LocalButton);
+ processPanel.Children.Add(_build7DomainButton);
+ processPanel.Children.Add(_build7UploadButton);
+ processPanel.Children.Add(_build7DatabaseButton);
+ processPanel.Children.Add(_build7SpaceshipButton);
+ processPanel.Children.Add(_build7AllButton);
+
+ processBox.Content = processPanel;
+
+ Grid.SetRow(processBox, 0);
+ root.Children.Add(processBox);
+
+ var apiBox = new GroupBox
+ {
+ Header = "Spaceship API",
+ Margin = new Thickness(0, 0, 0, 12)
+ };
+
+ var apiGrid = new Grid
+ {
+ Margin = new Thickness(10)
+ };
+
+ apiGrid.ColumnDefinitions.Add(
+ new ColumnDefinition
+ {
+ Width = new GridLength(205)
+ });
+
+ apiGrid.ColumnDefinitions.Add(
+ new ColumnDefinition
+ {
+ Width = new GridLength(1, GridUnitType.Star)
+ });
+
+ for (var index = 0; index < 7; index++)
+ {
+ apiGrid.RowDefinitions.Add(
+ new RowDefinition
+ {
+ Height = GridLength.Auto
+ });
+ }
+
+ _spaceshipBaseUrlTextBox = AddTextSetting(
+ apiGrid,
+ 0,
+ "Base URL:",
+ "https://spaceship.dev/api/v1");
+
+ _spaceshipKeyTextBox = AddTextSetting(
+ apiGrid,
+ 1,
+ "API Key:",
+ string.Empty);
+
+ _spaceshipSecretPasswordBox =
+ new PasswordBox
+ {
+ Margin = new Thickness(0, 0, 0, 8)
+ };
+
+ AddLabel(
+ apiGrid,
+ 2,
+ "API Secret:");
+
+ Grid.SetRow(_spaceshipSecretPasswordBox, 2);
+ Grid.SetColumn(_spaceshipSecretPasswordBox, 1);
+ apiGrid.Children.Add(_spaceshipSecretPasswordBox);
+
+ _spaceshipSecretStatus = new TextBlock
+ {
+ Margin = new Thickness(0, 0, 0, 8),
+ Foreground = Brushes.DimGray,
+ Text = "API Secret ещё не сохранён."
+ };
+
+ Grid.SetRow(_spaceshipSecretStatus, 3);
+ Grid.SetColumn(_spaceshipSecretStatus, 1);
+ apiGrid.Children.Add(_spaceshipSecretStatus);
+
+ _spaceshipDomainTextBox = AddTextSetting(
+ apiGrid,
+ 4,
+ "Домен для проверки:",
+ string.Empty);
+
+ _spaceshipDnsPathTextBox = AddTextSetting(
+ apiGrid,
+ 5,
+ "DNS path:",
+ "dns/records/{domain}");
+
+ var apiButtons = new WrapPanel
+ {
+ Margin = new Thickness(0, 5, 0, 0)
+ };
+
+ var saveButton = new Button
+ {
+ Content = "Сохранить Spaceship",
+ Width = 190,
+ Padding = new Thickness(10, 6, 10, 6),
+ Margin = new Thickness(0, 0, 8, 8)
+ };
+
+ saveButton.Click += (_, _) =>
+ {
+ try
+ {
+ SaveSpaceshipSettings();
+
+ SetBuild7Status(
+ 0,
+ "Настройки Spaceship сохранены. " +
+ "API Secret защищён Windows DPAPI.");
+
+ AddLog(
+ "INFO",
+ string.Empty,
+ "Настройки Spaceship сохранены. " +
+ "API Secret в журнал не записан.");
+ }
+ catch (Exception exception)
+ {
+ ShowBuild7Error(
+ string.Empty,
+ exception);
+ }
+ };
+
+ var testButton = new Button
+ {
+ Content = "Проверить Spaceship API",
+ Width = 205,
+ Padding = new Thickness(10, 6, 10, 6),
+ Margin = new Thickness(0, 0, 8, 8)
+ };
+
+ testButton.Click += async (_, _) =>
+ await ExecuteBuild7OperationAsync(
+ TestSpaceshipForSelectedJobAsync);
+
+ apiButtons.Children.Add(saveButton);
+ apiButtons.Children.Add(testButton);
+
+ Grid.SetRow(apiButtons, 6);
+ Grid.SetColumnSpan(apiButtons, 2);
+ apiGrid.Children.Add(apiButtons);
+
+ apiBox.Content = apiGrid;
+
+ Grid.SetRow(apiBox, 1);
+ root.Children.Add(apiBox);
+
+ _build7Progress = new ProgressBar
+ {
+ Minimum = 0,
+ Maximum = 100,
+ Height = 22,
+ Margin = new Thickness(0, 0, 0, 8)
+ };
+
+ Grid.SetRow(_build7Progress, 2);
+ root.Children.Add(_build7Progress);
+
+ var statusBorder = new Border
+ {
+ Padding = new Thickness(10),
+ Background = new SolidColorBrush(
+ Color.FromRgb(241, 247, 241)),
+ BorderBrush = new SolidColorBrush(
+ Color.FromRgb(150, 190, 150)),
+ BorderThickness = new Thickness(1)
+ };
+
+ _build7Status = new TextBlock
+ {
+ TextWrapping = TextWrapping.Wrap,
+ Text =
+ "Выберите задание в таблице «Задания» или " +
+ "запустите полный процесс."
+ };
+
+ statusBorder.Child = _build7Status;
+
+ Grid.SetRow(statusBorder, 3);
+ root.Children.Add(statusBorder);
+
+ return new TabItem
+ {
+ Header = "Процессы / Spaceship",
+ Content = new ScrollViewer
+ {
+ VerticalScrollBarVisibility =
+ ScrollBarVisibility.Auto,
+ Content = root
+ }
+ };
+ }
+
+ private Button CreateProcessButton(
+ string caption,
+ double width,
+ Func<Task> action)
+ {
+ var button = new Button
+ {
+ Content = caption,
+ Width = width,
+ Padding = new Thickness(10, 7, 10, 7),
+ Margin = new Thickness(0, 0, 8, 8)
+ };
+
+ button.Click += async (_, _) =>
+ await ExecuteBuild7OperationAsync(action);
+
+ return button;
+ }
+
+ private async Task ExecuteBuild7OperationAsync(
+ Func<Task> action)
+ {
+ if (_isRunning)
+ {
+ MessageBox.Show(
+ this,
+ "Дождитесь завершения текущей операции.",
+ "Процессы",
+ MessageBoxButton.OK,
+ MessageBoxImage.Information);
+
+ return;
+ }
+
+ SetBuild7ButtonsEnabled(false);
+
+ try
+ {
+ await action();
+ }
+ catch (OperationCanceledException)
+ {
+ SetBuild7Status(
+ _build7Progress?.Value ?? 0,
+ "Операция отменена.");
+
+ AddLog(
+ "WARN",
+ string.Empty,
+ "Операция Сборки 7 отменена.");
+ }
+ catch (Exception exception)
+ {
+ ShowBuild7Error(
+ GetSelectedJob()?.Domain ?? string.Empty,
+ exception);
+ }
+ finally
+ {
+ SetBuild7ButtonsEnabled(true);
+ }
+ }
+
+ private async Task RunAllProcessesAsync()
+ {
+ var confirmation = MessageBox.Show(
+ this,
+ "Запустить последовательный процесс?\n\n" +
+ "1. Локальная обработка, если задания ещё не созданы.\n" +
+ "2. Создание WWW-домена.\n" +
+ "3. Загрузка файлов.\n" +
+ "4. Создание БД и импорт SQL.\n" +
+ "5. Проверка доступа к DNS через Spaceship API.\n\n" +
+ "Текущие обработчики могут запросить дополнительное " +
+ "подтверждение опасных операций.",
+ "Полный процесс",
+ MessageBoxButton.YesNo,
+ MessageBoxImage.Question);
+
+ if (confirmation != MessageBoxResult.Yes)
+ {
+ return;
+ }
+
+ if (!_jobs.Any(job =>
+ !string.IsNullOrWhiteSpace(job.OutputPath) &&
+ Directory.Exists(job.OutputPath)))
+ {
+ SetBuild7Status(
+ 2,
+ "Этап 1: локальная обработка.");
+
+ Start_Click(
+ this,
+ new RoutedEventArgs());
+
+ await WaitForLegacyOperationAsync();
+ }
+
+ var jobs = _jobs
+ .Where(job =>
+ !string.IsNullOrWhiteSpace(job.OutputPath) &&
+ Directory.Exists(job.OutputPath))
+ .Reverse()
+ .ToList();
+
+ if (jobs.Count == 0)
+ {
+ throw new InvalidOperationException(
+ "Нет готовых локальных заданий. " +
+ "Проверьте исходную папку, домены и правила замен.");
+ }
+
+ var totalStages = jobs.Count * 4;
+ var completedStages = 0;
+
+ foreach (var job in jobs)
+ {
+ JobsGrid.SelectedItem = job;
+ JobsGrid.ScrollIntoView(job);
+
+ SetBuild7Status(
+ CalculateAllPercent(
+ completedStages,
+ totalStages),
+ $"{job.Domain}: создание WWW-домена.");
+
+ CreateSelectedWebDomain_Click(
+ this,
+ new RoutedEventArgs());
+
+ await WaitForLegacyOperationAsync();
+ completedStages++;
+
+ SetBuild7Status(
+ CalculateAllPercent(
+ completedStages,
+ totalStages),
+ $"{job.Domain}: загрузка файлов.");
+
+ DeploySelectedSite_Click(
+ this,
+ new RoutedEventArgs());
+
+ await WaitForLegacyOperationAsync();
+ completedStages++;
+
+ SetBuild7Status(
+ CalculateAllPercent(
+ completedStages,
+ totalStages),
+ $"{job.Domain}: создание БД и импорт SQL.");
+
+ DeployDatabaseButton_Click(
+ this,
+ new RoutedEventArgs());
+
+ await WaitForLegacyOperationAsync();
+ completedStages++;
+
+ SetBuild7Status(
+ CalculateAllPercent(
+ completedStages,
+ totalStages),
+ $"{job.Domain}: проверка Spaceship DNS API.");
+
+ if (_spaceshipDomainTextBox is not null)
+ {
+ _spaceshipDomainTextBox.Text = job.Domain;
+ }
+
+ await TestSpaceshipAsync(job.Domain);
+ completedStages++;
+ }
+
+ SetBuild7Status(
+ 100,
+ $"Полный процесс завершён. Обработано доменов: " +
+ jobs.Count + ".");
+
+ AddLog(
+ "INFO",
+ string.Empty,
+ $"Полный процесс завершён. Доменов: {jobs.Count}.");
+
+ MessageBox.Show(
+ this,
+ $"Полный процесс завершён.\nОбработано доменов: " +
+ jobs.Count + ".",
+ "Готово",
+ MessageBoxButton.OK,
+ MessageBoxImage.Information);
+ }
+
+ private async Task WaitForLegacyOperationAsync()
+ {
+ // async void обработчики переключают _isRunning до первого
+ // длительного await. Небольшая задержка позволяет обработчику
+ // перейти в рабочее состояние.
+ await Task.Delay(150);
+
+ while (_isRunning)
+ {
+ await Task.Delay(250);
+ }
+ }
+
+ private static int CalculateAllPercent(
+ int completed,
+ int total)
+ {
+ if (total <= 0)
+ {
+ return 0;
+ }
+
+ return Math.Clamp(
+ completed * 100 / total,
+ 0,
+ 99);
+ }
+
+ private async Task TestSpaceshipForSelectedJobAsync()
+ {
+ var domain =
+ _spaceshipDomainTextBox?.Text.Trim();
+
+ if (string.IsNullOrWhiteSpace(domain))
+ {
+ domain = GetSelectedJob()?.Domain;
+ }
+
+ if (string.IsNullOrWhiteSpace(domain))
+ {
+ throw new InvalidOperationException(
+ "Укажите домен Spaceship или выберите задание.");
+ }
+
+ await TestSpaceshipAsync(domain);
+ }
+
+ private async Task TestSpaceshipAsync(string domain)
+ {
+ var settings = ReadSpaceshipSettings();
+
+ if (string.IsNullOrWhiteSpace(settings.ApiSecret))
+ {
+ throw new InvalidOperationException(
+ "Введите или сохраните Spaceship API Secret.");
+ }
+
+ SaveSpaceshipSettings();
+
+ var relativePath = settings.DnsPath
+ .Replace(
+ "{domain}",
+ Uri.EscapeDataString(domain),
+ StringComparison.OrdinalIgnoreCase)
+ .TrimStart('/');
+
+ var baseUrl = settings.BaseUrl.TrimEnd('/');
+ var requestUrl = baseUrl + "/" + relativePath;
+
+ SetBuild7Status(
+ _build7Progress?.Value ?? 0,
+ $"Spaceship API: чтение DNS-зоны {domain}.");
+
+ using var request = new HttpRequestMessage(
+ HttpMethod.Get,
+ requestUrl);
+
+ request.Headers.TryAddWithoutValidation(
+ "X-API-Key",
+ settings.ApiKey);
+
+ request.Headers.TryAddWithoutValidation(
+ "X-API-Secret",
+ settings.ApiSecret);
+
+ using var response =
+ await _spaceshipHttpClient.SendAsync(
+ request,
+ HttpCompletionOption.ResponseHeadersRead);
+
+ var body = await response.Content.ReadAsStringAsync();
+
+ if (!response.IsSuccessStatusCode)
+ {
+ var safeBody = LimitAndRedact(
+ body,
+ settings.ApiKey,
+ settings.ApiSecret);
+
+ throw new InvalidOperationException(
+ $"Spaceship API вернул HTTP " +
+ $"{(int)response.StatusCode} " +
+ $"{response.ReasonPhrase}. {safeBody}");
+ }
+
+ var resultDescription = DescribeJson(body);
+
+ SetBuild7Status(
+ Math.Max(
+ 1,
+ (int)(_build7Progress?.Value ?? 0)),
+ $"Spaceship API доступен. Домен: {domain}. " +
+ resultDescription);
+
+ AddLog(
+ "INFO",
+ domain,
+ "Spaceship API: DNS-зона успешно прочитана.");
+ }
+
+ private SpaceshipRuntimeSettings ReadSpaceshipSettings()
+ {
+ if (_spaceshipBaseUrlTextBox is null ||
+ _spaceshipKeyTextBox is null ||
+ _spaceshipSecretPasswordBox is null ||
+ _spaceshipDnsPathTextBox is null)
+ {
+ throw new InvalidOperationException(
+ "Интерфейс Spaceship не инициализирован.");
+ }
+
+ var stored = LoadSpaceshipSettingsFile();
+
+ var secret =
+ _spaceshipSecretPasswordBox.Password;
+
+ if (string.IsNullOrEmpty(secret) &&
+ !string.IsNullOrWhiteSpace(stored.EncryptedSecret))
+ {
+ secret = UnprotectSecret(
+ stored.EncryptedSecret);
+ }
+
+ var settings = new SpaceshipRuntimeSettings
+ {
+ BaseUrl = _spaceshipBaseUrlTextBox.Text.Trim(),
+ ApiKey = _spaceshipKeyTextBox.Text.Trim(),
+ ApiSecret = secret,
+ DnsPath = _spaceshipDnsPathTextBox.Text.Trim()
+ };
+
+ if (!Uri.TryCreate(
+ settings.BaseUrl,
+ UriKind.Absolute,
+ out var uri) ||
+ uri.Scheme != Uri.UriSchemeHttps)
+ {
+ throw new InvalidOperationException(
+ "Spaceship Base URL должен быть абсолютным HTTPS URL.");
+ }
+
+ if (string.IsNullOrWhiteSpace(settings.ApiKey))
+ {
+ throw new InvalidOperationException(
+ "Не указан Spaceship API Key.");
+ }
+
+ if (string.IsNullOrWhiteSpace(settings.DnsPath) ||
+ !settings.DnsPath.Contains(
+ "{domain}",
+ StringComparison.OrdinalIgnoreCase))
+ {
+ throw new InvalidOperationException(
+ "DNS path должен содержать {domain}.");
+ }
+
+ return settings;
+ }
+
+ private void SaveSpaceshipSettings()
+ {
+ var settings = ReadSpaceshipSettings();
+
+ var stored = new SpaceshipStoredSettings
+ {
+ BaseUrl = settings.BaseUrl,
+ ApiKey = settings.ApiKey,
+ DnsPath = settings.DnsPath,
+ EncryptedSecret = ProtectSecret(
+ settings.ApiSecret)
+ };
+
+ var directory = Path.GetDirectoryName(
+ SpaceshipSettingsPath);
+
+ if (string.IsNullOrWhiteSpace(directory))
+ {
+ throw new InvalidOperationException(
+ "Не удалось определить папку настроек.");
+ }
+
+ Directory.CreateDirectory(directory);
+
+ var temporaryPath =
+ SpaceshipSettingsPath + ".tmp";
+
+ var json = JsonSerializer.Serialize(
+ stored,
+ new JsonSerializerOptions
+ {
+ WriteIndented = true
+ });
+
+ File.WriteAllText(
+ temporaryPath,
+ json,
+ new UTF8Encoding(false));
+
+ File.Move(
+ temporaryPath,
+ SpaceshipSettingsPath,
+ true);
+
+ _spaceshipSecretPasswordBox?.Clear();
+
+ if (_spaceshipSecretStatus is not null)
+ {
+ _spaceshipSecretStatus.Text =
+ "API Secret сохранён и защищён Windows DPAPI.";
+ }
+ }
+
+ private void LoadSpaceshipSettings()
+ {
+ var stored = LoadSpaceshipSettingsFile();
+
+ if (_spaceshipBaseUrlTextBox is not null)
+ {
+ _spaceshipBaseUrlTextBox.Text =
+ string.IsNullOrWhiteSpace(stored.BaseUrl)
+ ? "https://spaceship.dev/api/v1"
+ : stored.BaseUrl;
+ }
+
+ if (_spaceshipKeyTextBox is not null)
+ {
+ _spaceshipKeyTextBox.Text = stored.ApiKey;
+ }
+
+ if (_spaceshipDnsPathTextBox is not null)
+ {
+ _spaceshipDnsPathTextBox.Text =
+ string.IsNullOrWhiteSpace(stored.DnsPath)
+ ? "dns/records/{domain}"
+ : stored.DnsPath;
+ }
+
+ if (_spaceshipSecretStatus is not null)
+ {
+ _spaceshipSecretStatus.Text =
+ string.IsNullOrWhiteSpace(stored.EncryptedSecret)
+ ? "API Secret ещё не сохранён."
+ : "Зашифрованный API Secret сохранён.";
+ }
+ }
+
+ private SpaceshipStoredSettings LoadSpaceshipSettingsFile()
+ {
+ if (!File.Exists(SpaceshipSettingsPath))
+ {
+ return new SpaceshipStoredSettings();
+ }
+
+ try
+ {
+ var json = File.ReadAllText(
+ SpaceshipSettingsPath,
+ Encoding.UTF8);
+
+ return JsonSerializer.Deserialize<
+ SpaceshipStoredSettings>(json) ??
+ new SpaceshipStoredSettings();
+ }
+ catch
+ {
+ return new SpaceshipStoredSettings();
+ }
+ }
+
+ private static string ProtectSecret(string value)
+ {
+ if (string.IsNullOrEmpty(value))
+ {
+ return string.Empty;
+ }
+
+ var plainBytes = Encoding.UTF8.GetBytes(value);
+
+ try
+ {
+ var encrypted = ProtectedData.Protect(
+ plainBytes,
+ SpaceshipEntropy,
+ DataProtectionScope.CurrentUser);
+
+ return Convert.ToBase64String(encrypted);
+ }
+ finally
+ {
+ CryptographicOperations.ZeroMemory(plainBytes);
+ }
+ }
+
+ private static string UnprotectSecret(string value)
+ {
+ var encrypted = Convert.FromBase64String(value);
+ var plainBytes = ProtectedData.Unprotect(
+ encrypted,
+ SpaceshipEntropy,
+ DataProtectionScope.CurrentUser);
+
+ try
+ {
+ return Encoding.UTF8.GetString(plainBytes);
+ }
+ finally
+ {
+ CryptographicOperations.ZeroMemory(plainBytes);
+ }
+ }
+
+ private static string DescribeJson(string text)
+ {
+ if (string.IsNullOrWhiteSpace(text))
+ {
+ return "Ответ получен без тела.";
+ }
+
+ try
+ {
+ using var document = JsonDocument.Parse(text);
+
+ return document.RootElement.ValueKind switch
+ {
+ JsonValueKind.Array =>
+ "Получен массив элементов: " +
+ document.RootElement.GetArrayLength() + ".",
+
+ JsonValueKind.Object =>
+ "Получен корректный JSON-объект.",
+
+ _ =>
+ "Получен корректный JSON-ответ."
+ };
+ }
+ catch
+ {
+ return "Получен ответ API.";
+ }
+ }
+
+ private static string LimitAndRedact(
+ string value,
+ params string[] secrets)
+ {
+ var result = value ?? string.Empty;
+
+ foreach (var secret in secrets)
+ {
+ if (!string.IsNullOrEmpty(secret))
+ {
+ result = result.Replace(
+ secret,
+ "[СКРЫТО]",
+ StringComparison.Ordinal);
+ }
+ }
+
+ result = SensitiveDataRedactor.Redact(result)
+ .Replace('\r', ' ')
+ .Replace('\n', ' ')
+ .Trim();
+
+ return result.Length > 1000
+ ? result[..1000]
+ : result;
+ }
+
+ private DomainJob? GetSelectedJob()
+ {
+ return JobsGrid.SelectedItem as DomainJob;
+ }
+
+ private DomainJob EnsureSelectedJob()
+ {
+ return GetSelectedJob() ??
+ throw new InvalidOperationException(
+ "Выберите домен во вкладке «Задания».");
+ }
+
+ private void SetBuild7Status(
+ double progress,
+ string message)
+ {
+ if (_build7Progress is not null)
+ {
+ _build7Progress.Value = Math.Clamp(
+ progress,
+ 0,
+ 100);
+ }
+
+ if (_build7Status is not null)
+ {
+ _build7Status.Text = message;
+ }
+
+ SetStatus(message);
+ }
+
+ private void SetBuild7ButtonsEnabled(bool enabled)
+ {
+ if (_build7LocalButton is not null)
+ _build7LocalButton.IsEnabled = enabled;
+
+ if (_build7DomainButton is not null)
+ _build7DomainButton.IsEnabled = enabled;
+
+ if (_build7UploadButton is not null)
+ _build7UploadButton.IsEnabled = enabled;
+
+ if (_build7DatabaseButton is not null)
+ _build7DatabaseButton.IsEnabled = enabled;
+
+ if (_build7SpaceshipButton is not null)
+ _build7SpaceshipButton.IsEnabled = enabled;
+
+ if (_build7AllButton is not null)
+ _build7AllButton.IsEnabled = enabled;
+ }
+
+ private void ShowBuild7Error(
+ string domain,
+ Exception exception)
+ {
+ var message = SensitiveDataRedactor.Redact(
+ exception.Message);
+
+ SetBuild7Status(
+ _build7Progress?.Value ?? 0,
+ message);
+
+ AddLog(
+ "ERROR",
+ domain,
+ message);
+
+ MessageBox.Show(
+ this,
+ message,
+ "Ошибка процесса",
+ MessageBoxButton.OK,
+ MessageBoxImage.Error);
+ }
+
+ private static TextBox AddTextSetting(
+ Grid grid,
+ int row,
+ string label,
+ string defaultValue)
+ {
+ AddLabel(grid, row, label);
+
+ var textBox = new TextBox
+ {
+ Text = defaultValue,
+ Margin = new Thickness(0, 0, 0, 8)
+ };
+
+ Grid.SetRow(textBox, row);
+ Grid.SetColumn(textBox, 1);
+ grid.Children.Add(textBox);
+
+ return textBox;
+ }
+
+ private static void AddLabel(
+ Grid grid,
+ int row,
+ string text)
+ {
+ var label = new TextBlock
+ {
+ Text = text,
+ VerticalAlignment = VerticalAlignment.Center,
+ Margin = new Thickness(0, 0, 10, 8)
+ };
+
+ Grid.SetRow(label, row);
+ Grid.SetColumn(label, 0);
+ grid.Children.Add(label);
+ }
+
+ private static T? FindVisualChild<T>(
+ DependencyObject parent)
+ where T : DependencyObject
+ {
+ var count = VisualTreeHelper.GetChildrenCount(parent);
+
+ for (var index = 0; index < count; index++)
+ {
+ var child = VisualTreeHelper.GetChild(
+ parent,
+ index);
+
+ if (child is T result)
+ {
+ return result;
+ }
+
+ var nested = FindVisualChild<T>(child);
+
+ if (nested is not null)
+ {
+ return nested;
+ }
+ }
+
+ return null;
+ }
+
+ private static string SpaceshipSettingsPath =>
+ Path.Combine(
+ Environment.GetFolderPath(
+ Environment.SpecialFolder.LocalApplicationData),
+ "TextFileProcessor",
+ "spaceship-settings.json");
+
+ private static readonly byte[] SpaceshipEntropy =
+ Encoding.UTF8.GetBytes(
+ "TextFileProcessor.Spaceship.Build7.v1");
+
+ private sealed class SpaceshipRuntimeSettings
+ {
+ public string BaseUrl { get; init; } =
+ "https://spaceship.dev/api/v1";
+
+ public string ApiKey { get; init; } = string.Empty;
+
+ public string ApiSecret { get; init; } = string.Empty;
+
+ public string DnsPath { get; init; } =
+ "dns/records/{domain}";
+ }
+
+ private sealed class SpaceshipStoredSettings
+ {
+ public string BaseUrl { get; set; } =
+ "https://spaceship.dev/api/v1";
+
+ public string ApiKey { get; set; } = string.Empty;
+
+ public string EncryptedSecret { get; set; } =
+ string.Empty;
+
+ public string DnsPath { get; set; } =
+ "dns/records/{domain}";
+ }
+}
+'@
+
+Set-Content `
+ -LiteralPath $Build7File `
+ -Value $build7Source `
+ -Encoding UTF8
+
+Write-Host "Создан: $Build7File"
+
+Write-Step 'Очистка старой сборки'
+
+Push-Location $ProjectRoot
+
+try {
+ if (Test-Path -LiteralPath (Join-Path $ProjectRoot 'bin')) {
+ Remove-Item `
+ -LiteralPath (Join-Path $ProjectRoot 'bin') `
+ -Recurse `
+ -Force
+ }
+
+ if (Test-Path -LiteralPath (Join-Path $ProjectRoot 'obj')) {
+ Remove-Item `
+ -LiteralPath (Join-Path $ProjectRoot 'obj') `
+ -Recurse `
+ -Force
+ }
+
+ if (Test-Path -LiteralPath $PublishDirectory) {
+ Remove-Item `
+ -LiteralPath $PublishDirectory `
+ -Recurse `
+ -Force
+ }
+
+ Write-Step 'Восстановление NuGet-пакетов'
+
+ & dotnet restore $ProjectFile `
+ --runtime win-x64
+
+ if ($LASTEXITCODE -ne 0) {
+ throw "dotnet restore завершился с кодом $LASTEXITCODE"
+ }
+
+ Write-Step 'Проверочная сборка Release x64'
+
+ & dotnet build $ProjectFile `
+ --configuration Release `
+ --runtime win-x64 `
+ --no-restore
+
+ if ($LASTEXITCODE -ne 0) {
+ throw "dotnet build завершился с кодом $LASTEXITCODE"
+ }
+
+ Write-Step 'Публикация Windows x64'
+
+ & dotnet publish $ProjectFile `
+ --configuration Release `
+ --runtime win-x64 `
+ --self-contained true `
+ --output $PublishDirectory `
+ -p:PublishSingleFile=true `
+ -p:IncludeNativeLibrariesForSelfExtract=true `
+ -p:EnableCompressionInSingleFile=true
+
+ if ($LASTEXITCODE -ne 0) {
+ throw "dotnet publish завершился с кодом $LASTEXITCODE"
+ }
+}
+finally {
+ Pop-Location
+}
+
+$exePath = Join-Path $PublishDirectory 'TextFileProcessor.exe'
+
+if (-not (Test-Path -LiteralPath $exePath -PathType Leaf)) {
+ throw "Сборка завершилась, но EXE не найден: $exePath"
+}
+
+Write-Step 'ГОТОВО'
+
+Write-Host "EXE:" -ForegroundColor Green
+Write-Host $exePath -ForegroundColor Yellow
+Write-Host
+Write-Host "Резервная копия:" -ForegroundColor Green
+Write-Host $backupRoot -ForegroundColor Yellow
+
+Start-Process explorer.exe `
+ -ArgumentList "/select,`"$exePath`""
+
+2. Запуск
+Откройте Windows x64 PowerShell 7 от имени администратора и выполните:
+
+Set-ExecutionPolicy -Scope Process Bypass -Force
+
+& 'C:\Users\User\Desktop\Adminki\. Программа домены\BUILD7.ps1'
+
+Готовый файл должен появиться здесь:
+
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\publish\win-x64\TextFileProcessor.exe
+
+3. Настройка Spaceship
+В программе откройте вкладку:
+
+Процессы / Spaceship
+
+Заполните:
+
+Base URL: https://spaceship.dev/api/v1
+API Key: ваш API Key
+API Secret: ваш API Secret
+DNS path: dns/records/{domain}
+
+Нажмите:
+
+Сохранить Spaceship
+Проверить Spaceship API
+
+API Secret сохраняется локально в зашифрованном виде через DPAPI для текущего пользователя Windows и не записывается в журнал.
+
+Общая кнопка выполняет доступную цепочку:
+
+локальная обработка
+→ создание WWW-домена
+→ загрузка файлов
+→ создание БД
+→ импорт SQL
+→ проверка DNS-зоны через Spaceship API
+
+
+=== Проверка проекта ===
+Could not execute because the application was not found or a compatible .NET SDK is not installed.
+Possible reasons for this include:
+* You intended to execute a .NET program:
+The application '--version' does not exist.
+* You intended to execute a .NET SDK command:
+It was not possible to find any installed .NET SDKs.
+Install a .NET SDK from:
+https://aka.ms/dotnet-download
+Невозможно вызвать метод для выражения со зна...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Ошибка означает, что найден dotnet, но .NET SDK не установлен либо используется неправильный путь. Для сборки нужен именно SDK, а не только Runtime.
+
+1. Установите SDK
+Для проекта на .NET 8 выполните в PowerShell от администратора:
+
+winget install --id Microsoft.DotNet.SDK.8 --exact --source winget
+
+Если в .csproj указано:
+
+net9.0-windows — установите Microsoft.DotNet.SDK.9
+net10.0-windows — установите Microsoft.DotNet.SDK.10
+После установки полностью закройте PowerShell и откройте снова.
+
+2. Проверьте установку
+where.exe dotnet
+dotnet --list-sdks
+dotnet --version
+
+Ожидаемый путь:
+
+C:\Program Files\dotnet\dotnet.exe
+
+В dotnet --list-sdks должна появиться хотя бы одна версия, например:
+
+8.0.xxx [C:\Program Files\dotnet\sdk]
+
+Если первым выводится C:\Program Files (x86)\dotnet\dotnet.exe, временно исправьте PATH:
+
+$env:Path = "C:\Program Files\dotnet;$env:Path"
+
+dotnet --list-sdks
+dotnet --version
+
+3. Исправьте проверку в BUILD7.ps1
+Строку:
+
+$versionText = (& dotnet --version).Trim()
+
+замените на безопасную проверку:
+
+$dotnetCommand = Get-Command dotnet -ErrorAction SilentlyContinue
+
+if ($null -eq $dotnetCommand) {
+    throw @'
+Команда dotnet не найдена.
+Установите x64 .NET SDK:
+winget install --id Microsoft.DotNet.SDK.8 --exact --source winget
+После установки перезапустите PowerShell.
+'@
+}
+
+$sdkList = @(& dotnet --list-sdks 2>$null)
+
+if ($LASTEXITCODE -ne 0 -or $sdkList.Count -eq 0) {
+    throw @'
+.NET SDK не найден. Установлен только Runtime либо повреждён PATH.
+Установите x64 .NET SDK:
+winget install --id Microsoft.DotNet.SDK.8 --exact --source winget
+После установки перезапустите PowerShell.
+'@
+}
+
+$versionText = @(& dotnet --version 2>$null) |
+    Select-Object -First 1
+
+if ([string]::IsNullOrWhiteSpace($versionText)) {
+    throw 'Не удалось определить версию установленного .NET SDK.'
+}
+
+$versionText = $versionText.Trim()
+
+Write-Host "Найден .NET SDK: $versionText" -ForegroundColor Green
+Write-Host "Доступные SDK:" -ForegroundColor Green
+$sdkList | ForEach-Object {
+    Write-Host "  $_"
+}
+
+4. Повторите сборку
+Set-ExecutionPolicy -Scope Process Bypass -Force
+
+& 'C:\Users\User\Desktop\Adminki\. Программа домены\BUILD7.ps1'
+
+Не запускайте BUILD7.ps1 повторно, пока команда ниже не начнёт показывать установленную версию SDK:
+
+dotnet --list-sdks
+
+>> }
+>>
+.NET SDK не найден. Установлен только Runtime либо повреждён PATH.
+Установите x64 .NET SDK:
+winget install --id Microsoft.DotNet.SDK.8 --exact --source winget
+После установки перезапустите PowerShell.
+строка:15 знак:5
++ throw @'
++ ~~~~~~~~
++ CategoryInfo : OperationStopped: (.NET SDK не най...ите PowerShell.:String) , RuntimeException
++ FullyQualifiedErrorId : .NET SDK не найден. Установлен только Runtime либо повреждён PATH.
+...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Размышление
+
+
+Отлично: .NET SDK 8.0.424 установлен и теперь работает. Осталась только проблема: файл BUILD7.ps1 отсутствует по указанному пути либо рабочий стол находится в другой папке, например OneDrive.
+
+1. Найдите BUILD7.ps1
+Выполните:
+
+$buildScript = Get-ChildItem `
+    -Path $env:USERPROFILE `
+    -Filter 'BUILD7.ps1' `
+    -File `
+    -Recurse `
+    -ErrorAction SilentlyContinue |
+    Select-Object -First 1
+
+$buildScript.FullName
+
+2. Запустите найденный файл
+if ($null -eq $buildScript) {
+    Write-Host 'BUILD7.ps1 не найден в профиле пользователя.' -ForegroundColor Red
+}
+else {
+    Set-ExecutionPolicy -Scope Process Bypass -Force
+    & $buildScript.FullName
+}
+
+Если файл находится на рабочем столе OneDrive
+Проверьте возможные пути:
+
+Test-Path "$env:USERPROFILE\Desktop\Adminki\. Программа домены\BUILD7.ps1"
+Test-Path "$env:USERPROFILE\OneDrive\Desktop\Adminki\. Программа домены\BUILD7.ps1"
+Test-Path "$env:USERPROFILE\OneDrive\Рабочий стол\Adminki\. Программа домены\BUILD7.ps1"
+
+Если, например, второй вариант вернул True, запускайте так:
+
+& "$env:USERPROFILE\OneDrive\Desktop\Adminki\. Программа домены\BUILD7.ps1"
+
+Если поиск ничего не нашёл
+Значит, BUILD7.ps1 ещё не был сохранён как файл. Проверьте саму папку проекта:
+
+Get-ChildItem `
+    -Path "$env:USERPROFILE\Desktop","$env:USERPROFILE\OneDrive" `
+    -Directory `
+    -Recurse `
+    -ErrorAction SilentlyContinue |
+    Where-Object {
+        $_.Name -eq '. Программа домены'
+    } |
+    Select-Object -ExpandProperty FullName
+
+После определения настоящего пути сохраните скрипт именно под именем:
+
+BUILD7.ps1
+
+Обратите внимание, чтобы файл не назывался скрыто:
+
+BUILD7.ps1.txt
+
+Проверить файлы в предполагаемой папке можно так:
+
+Get-ChildItem -LiteralPath 'ПОЛНЫЙ_НАЙДЕННЫЙ_ПУТЬ' -Force |
+    Select-Object Name, FullName
+
+Текущая настройка PATH уже позволяет продолжить сборку:
+
+.NET SDK 8.0.424
+
+Если откроете новое окно PowerShell и SDK снова пропадёт, добавьте x64 dotnet в пользовательский PATH:
+
+$currentUserPath = [Environment]::GetEnvironmentVariable(
+    'Path',
+    'User'
+)
+
+if ($currentUserPath -notlike '*C:\Program Files\dotnet*') {
+    [Environment]::SetEnvironmentVariable(
+        'Path',
+        "C:\Program Files\dotnet;$currentUserPath",
+        'User'
+    )
+}
+
+Затем полностью закройте PowerShell и откройте заново.
+
+пришли еще раз исправленную каманду!
+полную!
+GPT-5.6 Sol
+GPT-5.6 Sol
+Скопируйте и выполните весь блок целиком в PowerShell:
+
+Set-ExecutionPolicy -Scope Process Bypass -Force
+
+$ErrorActionPreference = 'Stop'
+
+# Подключаем правильный x64 .NET SDK
+$dotnetExe = 'C:\Program Files\dotnet\dotnet.exe'
+
+if (-not (Test-Path -LiteralPath $dotnetExe -PathType Leaf)) {
+    throw "Не найден .NET: $dotnetExe"
+}
+
+$env:DOTNET_ROOT = 'C:\Program Files\dotnet'
+$env:Path = "C:\Program Files\dotnet;$env:Path"
+
+$sdkList = @(& $dotnetExe --list-sdks)
+
+if ($LASTEXITCODE -ne 0 -or $sdkList.Count -eq 0) {
+    throw '.NET SDK не найден.'
+}
+
+Write-Host "`nНайденные .NET SDK:" -ForegroundColor Green
+$sdkList | ForEach-Object {
+    Write-Host "  $_"
+}
+
+Write-Host "`nВерсия SDK:" -ForegroundColor Green
+& $dotnetExe --version
+
+# Проверяем стандартные расположения BUILD7.ps1
+$possiblePaths = @(
+    "$env:USERPROFILE\Desktop\Adminki\. Программа домены\BUILD7.ps1"
+    "$env:USERPROFILE\OneDrive\Desktop\Adminki\. Программа домены\BUILD7.ps1"
+    "$env:USERPROFILE\OneDrive\Рабочий стол\Adminki\. Программа домены\BUILD7.ps1"
+)
+
+$buildScript = $possiblePaths |
+    Where-Object {
+        Test-Path -LiteralPath $_ -PathType Leaf
+    } |
+    Select-Object -First 1
+
+# Если по стандартным путям файл не найден — ищем в профиле
+if ([string]::IsNullOrWhiteSpace($buildScript)) {
+    Write-Host "`nИщу BUILD7.ps1 в папке пользователя..." -ForegroundColor Yellow
+
+    $foundFile = Get-ChildItem `
+        -LiteralPath $env:USERPROFILE `
+        -Filter 'BUILD7.ps1' `
+        -File `
+        -Recurse `
+        -Force `
+        -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+
+    if ($null -ne $foundFile) {
+        $buildScript = $foundFile.FullName
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($buildScript)) {
+    Write-Host "`nBUILD7.ps1 не найден." -ForegroundColor Red
+    Write-Host 'Проверьте, что файл сохранён именно как BUILD7.ps1, а не BUILD7.ps1.txt.' -ForegroundColor Yellow
+    throw 'Сценарий сборки отсутствует на компьютере.'
+}
+
+Write-Host "`nНайден сценарий:" -ForegroundColor Green
+Write-Host $buildScript -ForegroundColor Cyan
+
+Write-Host "`nЗапускаю BUILD7.ps1..." -ForegroundColor Green
+
+& $buildScript
+
+if ($LASTEXITCODE -ne 0 -and $null -ne $LASTEXITCODE) {
+    throw "BUILD7.ps1 завершился с кодом $LASTEXITCODE"
+}
+
+У вас SDK уже найден:
+
+8.0.424 [C:\Program Files\dotnet\sdk]
+
+Поэтому этот блок подключит правильный dotnet, автоматически найдёт BUILD7.ps1 и запустит его. Если снова появится сообщение «BUILD7.ps1 не найден», значит сам файл не сохранён на компьютере или имеет расширение .ps1.txt.
+
+>> Write-Host "`nНайден сценарий:" -ForegroundColor Green
+>> Write-Host $buildScript -ForegroundColor Cyan
+>>
+>> Write-Host "`nЗапускаю BUILD7.ps1..." -ForegroundColor Green
+>>
+>> & $buildScript
+>>
+>> if ($LASTEXITCODE -ne 0 -and $null -ne $LASTEXITCODE) {
+>> throw "BUILD7.ps1 завершился с кодом $LASTEXITCODE"
+>> }
+>>
+
+Найденные .NET SDK:
+8.0.42...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Размышление
+
+
+Путь отличается: файл находится внутри папки «Новая папка». Скопируйте и выполните весь блок целиком:
+
+Set-ExecutionPolicy -Scope Process Bypass -Force
+
+$ErrorActionPreference = 'Stop'
+
+# Правильный путь к x64 .NET SDK
+$dotnetRoot = 'C:\Program Files\dotnet'
+$dotnetExe  = Join-Path $dotnetRoot 'dotnet.exe'
+
+if (-not (Test-Path -LiteralPath $dotnetExe -PathType Leaf)) {
+    throw "Не найден dotnet.exe: $dotnetExe"
+}
+
+$env:DOTNET_ROOT = $dotnetRoot
+$env:Path = "$dotnetRoot;$env:Path"
+
+# Проверка установленного SDK
+$sdkList = @(& $dotnetExe --list-sdks)
+
+if ($LASTEXITCODE -ne 0 -or $sdkList.Count -eq 0) {
+    throw '.NET SDK не найден.'
+}
+
+Write-Host "`nНайденные .NET SDK:" -ForegroundColor Green
+$sdkList | ForEach-Object {
+    Write-Host "  $_"
+}
+
+Write-Host "`nТекущая версия SDK:" -ForegroundColor Green
+& $dotnetExe --version
+
+# Папка, в которой находится BUILD7.ps1
+$projectFolder = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+
+if (-not (Test-Path -LiteralPath $projectFolder -PathType Container)) {
+    throw "Папка не найдена: $projectFolder"
+}
+
+# Сначала проверяем точный путь
+$buildScript = Join-Path $projectFolder 'BUILD7.ps1'
+
+# Если точного файла нет — ищем любой BUILD7.ps1 внутри папки
+if (-not (Test-Path -LiteralPath $buildScript -PathType Leaf)) {
+    Write-Host "`nИщу BUILD7.ps1 внутри папки проекта..." -ForegroundColor Yellow
+
+    $foundFile = Get-ChildItem `
+        -LiteralPath $projectFolder `
+        -Filter 'BUILD7.ps1' `
+        -File `
+        -Recurse `
+        -Force `
+        -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+
+    if ($null -ne $foundFile) {
+        $buildScript = $foundFile.FullName
+    }
+}
+
+if (-not (Test-Path -LiteralPath $buildScript -PathType Leaf)) {
+    Write-Host "`nBUILD7.ps1 не найден в папке:" -ForegroundColor Red
+    Write-Host $projectFolder -ForegroundColor Yellow
+
+    Write-Host "`nФайлы PowerShell, найденные в этой папке:" -ForegroundColor Yellow
+
+    $psFiles = @(
+        Get-ChildItem `
+            -LiteralPath $projectFolder `
+            -File `
+            -Recurse `
+            -Force `
+            -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Extension -in '.ps1', '.psm1', '.txt'
+        }
+    )
+
+    if ($psFiles.Count -eq 0) {
+        Write-Host 'Файлы .ps1, .psm1 и .txt не найдены.' -ForegroundColor Red
+    }
+    else {
+        $psFiles |
+            Select-Object Name, FullName |
+            Format-Table -AutoSize
+    }
+
+    throw 'Файл BUILD7.ps1 отсутствует или сохранён под другим именем.'
+}
+
+Write-Host "`nНайден сценарий:" -ForegroundColor Green
+Write-Host $buildScript -ForegroundColor Cyan
+
+# Убираем блокировку файла, если он был скачан
+Unblock-File -LiteralPath $buildScript -ErrorAction SilentlyContinue
+
+Write-Host "`nЗапускаю сборку..." -ForegroundColor Green
+
+Push-Location -LiteralPath $projectFolder
+
+try {
+    & $buildScript
+
+    if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) {
+        throw "BUILD7.ps1 завершился с кодом $LASTEXITCODE"
+    }
+}
+finally {
+    Pop-Location
+}
+
+Write-Host "`nBUILD7.ps1 успешно выполнен." -ForegroundColor Green
+
+Точный путь, который теперь используется:
+
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1
+
+Если файл действительно называется BUILD7.ps1, можно использовать и короткую команду:
+
+$env:Path = "C:\Program Files\dotnet;$env:Path"
+
+Set-ExecutionPolicy -Scope Process Bypass -Force
+
+& 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1'
+
+
+Найденные .NET SDK:
+8.0.424 [C:\Program Files\dotnet\sdk]
+
+Текущая версия SDK:
+8.0.424
+
+Найден сценарий:
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1
+
+Запускаю сборку...
+& : Не удается выполнить сценарий "BUILD7.ps1", так как он содержит оператор "#requires" для Windows PowerShell 7.0. Не
+обходимая для выполнения сценария версия Windows PowerShell не соответствует текущей версии Windows PowerShel...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Сейчас открыт Windows PowerShell 5.1, а сценарий требует PowerShell 7. Выполните следующий блок целиком в текущем окне PowerShell:
+
+$ErrorActionPreference = 'Stop'
+
+$buildScript = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1'
+$dotnetRoot  = 'C:\Program Files\dotnet'
+$pwshExe     = 'C:\Program Files\PowerShell\7\pwsh.exe'
+
+# Проверяем сценарий
+if (-not (Test-Path -LiteralPath $buildScript -PathType Leaf)) {
+    throw "Не найден сценарий: $buildScript"
+}
+
+# Проверяем .NET SDK
+$dotnetExe = Join-Path $dotnetRoot 'dotnet.exe'
+
+if (-not (Test-Path -LiteralPath $dotnetExe -PathType Leaf)) {
+    throw "Не найден .NET SDK: $dotnetExe"
+}
+
+# Устанавливаем PowerShell 7, если он отсутствует
+if (-not (Test-Path -LiteralPath $pwshExe -PathType Leaf)) {
+    Write-Host "`nPowerShell 7 не найден. Начинаю установку..." `
+        -ForegroundColor Yellow
+
+    $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
+
+    if ($null -eq $winget) {
+        throw @'
+Команда winget не найдена.
+
+Установите PowerShell 7 вручную:
+https://aka.ms/powershell-release?tag=stable
+
+После установки снова выполните этот блок.
+'@
+    }
+
+    & winget.exe install `
+        --id Microsoft.PowerShell `
+        --exact `
+        --source winget `
+        --accept-source-agreements `
+        --accept-package-agreements
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Установка PowerShell 7 завершилась с кодом $LASTEXITCODE"
+    }
+}
+
+# Повторно проверяем наличие PowerShell 7
+if (-not (Test-Path -LiteralPath $pwshExe -PathType Leaf)) {
+    throw "PowerShell 7 установлен, но файл не найден: $pwshExe"
+}
+
+Write-Host "`nPowerShell 7 найден:" -ForegroundColor Green
+& $pwshExe -NoLogo -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+
+Write-Host "`n.NET SDK:" -ForegroundColor Green
+& $dotnetExe --version
+
+Write-Host "`nЗапускаю BUILD7.ps1 через PowerShell 7..." `
+    -ForegroundColor Green
+
+# Запускаем BUILD7.ps1 именно через PowerShell 7
+& $pwshExe `
+    -NoLogo `
+    -NoProfile `
+    -ExecutionPolicy Bypass `
+    -File $buildScript
+
+$buildExitCode = $LASTEXITCODE
+
+if ($buildExitCode -ne 0) {
+    throw "BUILD7.ps1 завершился с кодом $buildExitCode"
+}
+
+Write-Host "`nСборка успешно завершена." -ForegroundColor Green
+
+После установки в дальнейшем достаточно этой короткой команды:
+
+& 'C:\Program Files\PowerShell\7\pwsh.exe' `
+    -NoLogo `
+    -NoProfile `
+    -ExecutionPolicy Bypass `
+    -File 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1'
+
+Важно: запускать нужно через pwsh.exe, а не через старый powershell.exe.
+
+
+PowerShell 7 не найден. Начинаю установку...
+Найдено PowerShell [Microsoft.PowerShell] Версия 7.6.5.0
+Лицензия на это приложение предоставлена вам владельцем.
+Корпорация Майкрософт не несет ответственность за сторонние пакеты и не предоставляет для них никакие лицензии.
+Скачивание https://github.com/PowerShell/PowerShell/releases/download/v7.6.5/PowerShell-7.6.5.msixbundle
+██████████████████████████████ 324 MB / 324 MB
+Хэш установщика успешно проверен
+Запуск уст...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Размышление
+
+
+PowerShell 7 установлен как MSIX-пакет, поэтому pwsh.exe находится не в C:\Program Files\PowerShell\7, а внутри WindowsApps.
+
+Скопируйте и выполните весь блок целиком в текущем PowerShell 5.1:
+
+$ErrorActionPreference = 'Stop'
+
+$buildScript = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1'
+$dotnetRoot  = 'C:\Program Files\dotnet'
+$dotnetExe   = Join-Path $dotnetRoot 'dotnet.exe'
+
+# Проверяем BUILD7.ps1
+if (-not (Test-Path -LiteralPath $buildScript -PathType Leaf)) {
+    throw "Не найден BUILD7.ps1: $buildScript"
+}
+
+# Проверяем .NET SDK
+if (-not (Test-Path -LiteralPath $dotnetExe -PathType Leaf)) {
+    throw "Не найден dotnet.exe: $dotnetExe"
+}
+
+$sdkList = @(& $dotnetExe --list-sdks)
+
+if ($LASTEXITCODE -ne 0 -or $sdkList.Count -eq 0) {
+    throw '.NET SDK не найден.'
+}
+
+Write-Host "`nНайденные .NET SDK:" -ForegroundColor Green
+$sdkList | ForEach-Object {
+    Write-Host "  $_"
+}
+
+# Ищем PowerShell 7 всеми доступными способами
+$pwshExe = $null
+
+# Вариант 1: команда уже доступна через PATH
+$pwshCommand = Get-Command pwsh.exe -ErrorAction SilentlyContinue
+
+if ($null -ne $pwshCommand) {
+    $pwshExe = $pwshCommand.Source
+}
+
+# Вариант 2: стандартная MSI-установка
+if ([string]::IsNullOrWhiteSpace($pwshExe)) {
+    $standardPwsh = 'C:\Program Files\PowerShell\7\pwsh.exe'
+
+    if (Test-Path -LiteralPath $standardPwsh -PathType Leaf) {
+        $pwshExe = $standardPwsh
+    }
+}
+
+# Вариант 3: псевдоним MSIX в WindowsApps пользователя
+if ([string]::IsNullOrWhiteSpace($pwshExe)) {
+    $windowsAppsPwsh = Join-Path `
+        $env:LOCALAPPDATA `
+        'Microsoft\WindowsApps\pwsh.exe'
+
+    if (Test-Path -LiteralPath $windowsAppsPwsh -PathType Leaf) {
+        $pwshExe = $windowsAppsPwsh
+    }
+}
+
+# Вариант 4: настоящий путь установленного MSIX-пакета
+if ([string]::IsNullOrWhiteSpace($pwshExe)) {
+    $powerShellPackage = Get-AppxPackage |
+        Where-Object {
+            $_.Name -eq 'Microsoft.PowerShell' -or
+            $_.PackageFamilyName -like 'Microsoft.PowerShell_*'
+        } |
+        Sort-Object Version -Descending |
+        Select-Object -First 1
+
+    if ($null -ne $powerShellPackage) {
+        $packagePwsh = Join-Path `
+            $powerShellPackage.InstallLocation `
+            'pwsh.exe'
+
+        if (Test-Path -LiteralPath $packagePwsh -PathType Leaf) {
+            $pwshExe = $packagePwsh
+        }
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($pwshExe)) {
+    throw @'
+PowerShell 7 установлен, но pwsh.exe не найден.
+
+Закройте все окна PowerShell, откройте PowerShell заново и выполните:
+
+pwsh
+
+Если команда не появится, перезагрузите Windows.
+'@
+}
+
+Write-Host "`nPowerShell 7 найден:" -ForegroundColor Green
+Write-Host $pwshExe -ForegroundColor Cyan
+
+Write-Host "`nВерсия PowerShell 7:" -ForegroundColor Green
+& $pwshExe -NoLogo -NoProfile -Command `
+    '$PSVersionTable.PSVersion.ToString()'
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Не удалось запустить PowerShell 7. Код: $LASTEXITCODE"
+}
+
+# Передаём правильный путь к .NET SDK дочернему процессу
+$env:DOTNET_ROOT = $dotnetRoot
+
+if (($env:Path -split ';') -notcontains $dotnetRoot) {
+    $env:Path = "$dotnetRoot;$env:Path"
+}
+
+Write-Host "`nЗапускаю BUILD7.ps1 через PowerShell 7..." `
+    -ForegroundColor Green
+
+& $pwshExe `
+    -NoLogo `
+    -NoProfile `
+    -ExecutionPolicy Bypass `
+    -File $buildScript
+
+$buildExitCode = $LASTEXITCODE
+
+if ($buildExitCode -ne 0) {
+    throw "BUILD7.ps1 завершился с кодом $buildExitCode"
+}
+
+Write-Host "`nСБОРКА УСПЕШНО ЗАВЕРШЕНА!" -ForegroundColor Green
+
+Причина ошибки: winget установил версию MSIX, чей реальный путь примерно такой:
+
+C:\Program Files\WindowsApps\Microsoft.PowerShell_7.6.5.0_x64__8wekyb3d8bbwe\pwsh.exe
+
+Приведённая команда сама найдёт точное расположение и запустит BUILD7.ps1.
+
+Найденные .NET SDK:
+8.0.424 [C:\Program Files\dotnet\sdk]
+
+PowerShell 7 найден:
+C:\Users\User\AppData\Local\Microsoft\WindowsApps\pwsh.exe
+
+Версия PowerShell 7:
+Сбой выполнения программы pwsh.exe: Не найдено соответствующих лицензий для приложениястрока:95 знак:1
++ & $pwshExe -NoLogo -NoProfile -Command `
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~.
+строка:95 знак:1
++ & $pwshExe -NoLogo -NoProfile -Command `
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+MSIX-версия PowerShell 7 установилась с ошибкой лицензии. Нужно удалить её и установить обычную MSI-версию x64.
+
+Запустите Windows PowerShell от имени администратора, затем вставьте весь блок целиком:
+
+$ErrorActionPreference = 'Stop'
+
+$buildScript = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1'
+$dotnetRoot  = 'C:\Program Files\dotnet'
+$dotnetExe   = Join-Path $dotnetRoot 'dotnet.exe'
+$pwshExe     = 'C:\Program Files\PowerShell\7\pwsh.exe'
+
+Write-Host "`n=== Проверка прав администратора ===" -ForegroundColor Cyan
+
+$isAdministrator = (
+    New-Object Security.Principal.WindowsPrincipal(
+        [Security.Principal.WindowsIdentity]::GetCurrent()
+    )
+).IsInRole(
+    [Security.Principal.WindowsBuiltInRole]::Administrator
+)
+
+if (-not $isAdministrator) {
+    throw @'
+PowerShell запущен без прав администратора.
+
+Закройте это окно, нажмите правой кнопкой мыши по
+«Windows PowerShell» и выберите «Запуск от имени администратора».
+Затем повторите команду.
+'@
+}
+
+Write-Host "Права администратора подтверждены." -ForegroundColor Green
+
+Write-Host "`n=== Проверка файлов ===" -ForegroundColor Cyan
+
+if (-not (Test-Path -LiteralPath $buildScript -PathType Leaf)) {
+    throw "Не найден сценарий: $buildScript"
+}
+
+if (-not (Test-Path -LiteralPath $dotnetExe -PathType Leaf)) {
+    throw "Не найден .NET: $dotnetExe"
+}
+
+Write-Host "BUILD7.ps1 найден." -ForegroundColor Green
+Write-Host ".NET найден: $dotnetExe" -ForegroundColor Green
+
+Write-Host "`n=== Удаление неисправной MSIX-версии PowerShell 7 ===" `
+    -ForegroundColor Cyan
+
+$appxPackages = @(
+    Get-AppxPackage -Name 'Microsoft.PowerShell' `
+        -ErrorAction SilentlyContinue
+)
+
+foreach ($package in $appxPackages) {
+    Write-Host "Удаляется пакет: $($package.PackageFullName)" `
+        -ForegroundColor Yellow
+
+    Remove-AppxPackage `
+        -Package $package.PackageFullName `
+        -ErrorAction Continue
+}
+
+# Удаляем повреждённый псевдоним текущего пользователя, если он остался
+$windowsAppsAlias = Join-Path `
+    $env:LOCALAPPDATA `
+    'Microsoft\WindowsApps\pwsh.exe'
+
+if (Test-Path -LiteralPath $windowsAppsAlias) {
+    Remove-Item `
+        -LiteralPath $windowsAppsAlias `
+        -Force `
+        -ErrorAction SilentlyContinue
+}
+
+Write-Host "`n=== Установка PowerShell 7 x64 в формате MSI ===" `
+    -ForegroundColor Cyan
+
+$wingetCommand = Get-Command winget.exe -ErrorAction SilentlyContinue
+
+if ($null -eq $wingetCommand) {
+    throw 'winget.exe не найден.'
+}
+
+& winget.exe install `
+    --id Microsoft.PowerShell `
+    --exact `
+    --source winget `
+    --scope machine `
+    --architecture x64 `
+    --installer-type wix `
+    --accept-source-agreements `
+    --accept-package-agreements `
+    --silent `
+    --force
+
+$installExitCode = $LASTEXITCODE
+
+# winget иногда возвращает код "уже установлено", поэтому проверяем сам файл
+if (-not (Test-Path -LiteralPath $pwshExe -PathType Leaf)) {
+    throw @"
+MSI-версия PowerShell 7 не появилась по ожидаемому пути.
+
+Код winget: $installExitCode
+Ожидаемый файл: $pwshExe
+"@
+}
+
+Write-Host "`nPowerShell 7 MSI установлен:" -ForegroundColor Green
+Write-Host $pwshExe -ForegroundColor Cyan
+
+Write-Host "`n=== Проверка PowerShell 7 ===" -ForegroundColor Cyan
+
+& $pwshExe `
+    -NoLogo `
+    -NoProfile `
+    -Command '$PSVersionTable.PSVersion.ToString()'
+
+if ($LASTEXITCODE -ne 0) {
+    throw "PowerShell 7 не запускается. Код ошибки: $LASTEXITCODE"
+}
+
+Write-Host "`n=== Проверка .NET SDK ===" -ForegroundColor Cyan
+
+$env:DOTNET_ROOT = $dotnetRoot
+$env:Path = "$dotnetRoot;$env:Path"
+
+& $dotnetExe --list-sdks
+
+if ($LASTEXITCODE -ne 0) {
+    throw 'Не удалось получить список .NET SDK.'
+}
+
+Write-Host "`n=== Запуск BUILD7.ps1 через PowerShell 7 ===" `
+    -ForegroundColor Cyan
+
+Unblock-File `
+    -LiteralPath $buildScript `
+    -ErrorAction SilentlyContinue
+
+& $pwshExe `
+    -NoLogo `
+    -NoProfile `
+    -ExecutionPolicy Bypass `
+    -File $buildScript
+
+$buildExitCode = $LASTEXITCODE
+
+if ($buildExitCode -ne 0) {
+    throw "BUILD7.ps1 завершился с кодом $buildExitCode"
+}
+
+Write-Host "`nСБОРКА УСПЕШНО ЗАВЕРШЕНА!" `
+    -ForegroundColor Green
+
+После успешной установки PowerShell 7 и в дальнейшем сценарий можно запускать короткой командой:
+
+& 'C:\Program Files\PowerShell\7\pwsh.exe' `
+    -NoLogo `
+    -NoProfile `
+    -ExecutionPolicy Bypass `
+    -File 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1'
+
+Ключевой момент: первая команда должна выполняться именно в окне «Windows PowerShell — администратор».
+
+Запускаю полученную программу, на этапе загрузки и создания БД в панели идет ошибка
+"Серверная команда завершилась кодом 1: ERROR exists(name) Name with 'casino71cfd' already exists ISP manager не создал базу данных" база была создана, удалил в ошибке нажал ок и сразу вторая ошибка - "Spaceship API вернул HTTP 422 Unprocessable Entity. {"detail":"The request is invalid.","data":[{"field":"take","details":&quo...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Навык активирован: page_content
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+Здесь три отдельные ошибки в логике программы, а не проблема ваших действий:
+
+Ответ ISPmanager exists(name) нужно обрабатывать как «БД уже существует», а не как полный провал операции.
+В запрос Spaceship не переданы обязательные параметры пагинации take и skip.
+После создания БД программа слишком рано или с неверными реквизитами проверяет подключение, получает код 41 и не запускает импорт.
+Права DNS Records Read/Write достаточны для чтения и изменения DNS-записей. Полный доступ к доменам для TXT-записей предоставлять не нужно. Ошибка 422 говорит не о правах, а именно об отсутствующих полях take и skip.
+
+Чтобы исправить именно вашу сборку, нужен исходный код. Вероятно, он встроен в BUILD7.ps1 или лежит рядом. Выполните этот блок — он соберёт нужные фрагменты в один файл на рабочем столе:
+
+$ErrorActionPreference = 'Stop'
+
+$project = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$output  = "$env:USERPROFILE\Desktop\DIAGNOSTIC.txt"
+
+if (-not (Test-Path -LiteralPath $project -PathType Container)) {
+    throw "Папка не найдена: $project"
+}
+
+$patterns = @(
+    'Spaceship'
+    'Unprocessable'
+    'take'
+    'skip'
+    'exists\(name\)'
+    'Создать БД'
+    'Созданная БД'
+    'проверку подключения'
+    'кодом 41'
+    'mysql'
+    'mariadb'
+    'ispmgr'
+    'ISPmanager'
+    'Import'
+    'импорт'
+)
+
+$extensions = @(
+    '.ps1', '.cs', '.csproj', '.json',
+    '.xml', '.config', '.xaml', '.sql'
+)
+
+$files = Get-ChildItem `
+    -LiteralPath $project `
+    -Recurse `
+    -File `
+    -Force `
+    -ErrorAction SilentlyContinue |
+    Where-Object {
+        $_.Extension.ToLowerInvariant() -in $extensions
+    }
+
+@(
+    "Папка проекта: $project"
+    "Дата: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+    "Найдено исходных файлов: $($files.Count)"
+    ''
+    '================ ФАЙЛЫ ================'
+
+    $files | ForEach-Object {
+        $_.FullName
+    }
+
+    ''
+    '================ СОВПАДЕНИЯ ================'
+
+    foreach ($file in $files) {
+        $matches = Select-String `
+            -LiteralPath $file.FullName `
+            -Pattern $patterns `
+            -CaseSensitive:$false `
+            -ErrorAction SilentlyContinue
+
+        if ($matches) {
+            ''
+            "----- $($file.FullName) -----"
+
+            $matches | ForEach-Object {
+                "Строка $($_.LineNumber): $($_.Line.Trim())"
+            }
+        }
+    }
+) | Out-File `
+    -LiteralPath $output `
+    -Encoding UTF8 `
+    -Width 10000
+
+Write-Host "`nГотово:" -ForegroundColor Green
+Write-Host $output -ForegroundColor Cyan
+
+notepad.exe $output
+
+Пришлите сюда содержимое DIAGNOSTIC.txt и сам файл:
+
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1
+
+Перед отправкой удалите из текста API-ключи, пароли, токены и секреты.
+
+Какие изменения потребуются в коде
+Запрос Spaceship должен содержать пагинацию, например:
+
+var url =
+    $"{endpoint}?take=100&skip=0";
+
+Если в URL уже есть параметры:
+
+var separator = endpoint.Contains('?') ? "&" : "?";
+var url = $"{endpoint}{separator}take=100&skip=0";
+
+Для постраничного получения:
+
+const int take = 100;
+var skip = 0;
+
+while (true)
+{
+    var url = $"{endpoint}?take={take}&skip={skip}";
+    var response = await httpClient.GetAsync(url);
+    response.EnsureSuccessStatusCode();
+
+    // Разобрать текущую страницу.
+
+    if (items.Count < take)
+        break;
+
+    skip += take;
+}
+
+Обработку ISPmanager следует изменить примерно так:
+
+var alreadyExists =
+    output.Contains("exists(name)", StringComparison.OrdinalIgnoreCase) ||
+    output.Contains("already exists", StringComparison.OrdinalIgnoreCase);
+
+if (exitCode != 0 && !alreadyExists)
+{
+    throw new InvalidOperationException(
+        $"ISPmanager не смог создать БД: {output}");
+}
+
+// Если БД уже существует — продолжить проверку и импорт.
+
+После создания БД необходим повтор подключения с задержкой:
+
+Exception? lastError = null;
+
+for (var attempt = 1; attempt <= 10; attempt++)
+{
+    try
+    {
+        await TestDatabaseConnectionAsync();
+        lastError = null;
+        break;
+    }
+    catch (Exception ex)
+    {
+        lastError = ex;
+        await Task.Delay(TimeSpan.FromSeconds(3));
+    }
+}
+
+if (lastError is not null)
+{
+    throw new InvalidOperationException(
+        "БД создана, но подключение не установлено после 10 попыток.",
+        lastError);
+}
+
+Но вставлять эти фрагменты вслепую опасно: надо увидеть используемые методы, endpoint Spaceship и команду ISPmanager. После получения BUILD7.ps1/исходников можно дать вам полностью исправленный файл, а не очередную диагностическую команду.
+
+последние строки перед запуском твоего кода.
+
+=== Запуск BUILD7.ps1 через PowerShell 7 === === Проверка проекта === .NET SDK: 8.0.424 === Создание резервной копии ===
+Резервная копия: C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\.build7-backup-20260905-145459
+
+=== Исправление DatabaseDeploymentService ===
+Исправлены валидация имени БД и передача пароля в mgrctl.
+
+=== Подключение Сборки 7 ===
+
+=== Создание MainWindow.Build7.cs ===
+Создан...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Пока программу повторно не запускайте и базу не удаляйте. По журналу видно, что BUILD7 сам генерирует MainWindow.Build7.cs и изменяет DatabaseDeploymentService.cs, поэтому исправлять только готовые .cs нельзя — следующая сборка затрёт изменения.
+
+Нужны точные участки исходного кода. Выполните один блок целиком в PowerShell. Он ничего не изменяет, а создаёт на рабочем столе файл FIX_INPUT.txt:
+
+$ErrorActionPreference = 'Stop'
+
+$project = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$output  = "$env:USERPROFILE\Desktop\FIX_INPUT.txt"
+
+function Add-SourceRange {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Path,
+
+        [Parameter(Mandatory)]
+        [int] $From,
+
+        [Parameter(Mandatory)]
+        [int] $To
+    )
+
+    Add-Content -LiteralPath $output -Encoding UTF8 -Value @"
+
+================================================================================
+ФАЙЛ: $Path
+СТРОКИ: $From-$To
+================================================================================
+"@
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        Add-Content -LiteralPath $output -Encoding UTF8 `
+            -Value "ФАЙЛ НЕ НАЙДЕН"
+        return
+    }
+
+    $lines = @(Get-Content -LiteralPath $Path -Encoding UTF8)
+
+    if ($lines.Count -eq 0) {
+        Add-Content -LiteralPath $output -Encoding UTF8 `
+            -Value "ФАЙЛ ПУСТ"
+        return
+    }
+
+    $actualFrom = [Math]::Max(1, $From)
+    $actualTo   = [Math]::Min($To, $lines.Count)
+
+    for ($number = $actualFrom; $number -le $actualTo; $number++) {
+        $line = $lines[$number - 1]
+
+        # Защита на случай случайно записанных в исходниках секретов
+        $line = $line -replace `
+            '(?i)(api[-_ ]?secret\s*[:=]\s*)["''][^"'']+["'']',
+            '$1"[СКРЫТО]"'
+
+        $line = $line -replace `
+            '(?i)(api[-_ ]?key\s*[:=]\s*)["''][^"'']+["'']',
+            '$1"[СКРЫТО]"'
+
+        $line = $line -replace `
+            '(?i)(password\s*[:=]\s*)["''][^"'']+["'']',
+            '$1"[СКРЫТО]"'
+
+        Add-Content -LiteralPath $output -Encoding UTF8 `
+            -Value ('{0,5}: {1}' -f $number, $line)
+    }
+}
+
+if (-not (Test-Path -LiteralPath $project -PathType Container)) {
+    throw "Папка проекта не найдена: $project"
+}
+
+Set-Content -LiteralPath $output -Encoding UTF8 -Value @"
+ДАННЫЕ ДЛЯ ИСПРАВЛЕНИЯ BUILD7
+Создано: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+Проект: $project
+
+ОШИБКИ:
+1. ISPmanager: exists(name), база фактически создаётся.
+2. Spaceship: HTTP 422 — обязательны take и skip.
+3. После создания БД: код 41, проверка подключения не проходит.
+"@
+
+# Логика, которой BUILD7 изменяет DatabaseDeploymentService
+Add-SourceRange `
+    -Path "$project\BUILD7.ps1" `
+    -From 1 `
+    -To 170
+
+# Генератор кода Spaceship внутри BUILD7
+Add-SourceRange `
+    -Path "$project\BUILD7.ps1" `
+    -From 780 `
+    -To 930
+
+# Завершение BUILD7 и параметры сборки
+Add-SourceRange `
+    -Path "$project\BUILD7.ps1" `
+    -From 1180 `
+    -To 1380
+
+# Полный действующий сервис создания БД и импорта
+Add-SourceRange `
+    -Path "$project\Services\DatabaseDeploymentService.cs" `
+    -From 1 `
+    -To 520
+
+# Действующий код обращения к Spaceship
+Add-SourceRange `
+    -Path "$project\MainWindow.Build7.cs" `
+    -From 620 `
+    -To 780
+
+# Вызов создания БД из интерфейса
+Add-SourceRange `
+    -Path "$project\MainWindow.Build4.cs" `
+    -From 1 `
+    -To 240
+
+# Параметры проекта и используемые библиотеки
+Add-SourceRange `
+    -Path "$project\TextFileProcessor.csproj" `
+    -From 1 `
+    -To 300
+
+Write-Host "`nФайл успешно создан:" -ForegroundColor Green
+Write-Host $output -ForegroundColor Cyan
+Write-Host "`nРазмер файла:" -ForegroundColor Green
+Write-Host "$((Get-Item -LiteralPath $output).Length) байт"
+
+Start-Process notepad.exe -ArgumentList "`"$output`""
+
+После выполнения пришлите сюда содержимое:
+
+C:\Users\User\Desktop\FIX_INPUT.txt
+
+Если оно не помещается одним сообщением, отправьте двумя частями:
+
+от начала до конца DatabaseDeploymentService.cs;
+всё остальное.
+API Key, API Secret, пароль ISPmanager и пароль БД не присылайте. Этот скрипт пытается их скрывать, но перед отправкой всё равно визуально проверьте текст.
+
+Предварительный вывод уже точный:
+
+полный доступ Spaceship не требуется — DNS Records Read/Write достаточно;
+HTTP 422 вызван программным дефектом запроса: отсутствуют take и skip;
+код 41 создаёт сам серверный сценарий на строке проверки MySQL;
+exists(name) должен переводиться в продолжение операции только после проверки существования БД;
+импорт SQL должен выполняться после нескольких попыток подключения, а сообщение об ошибке должно показывать реальную ошибку MySQL, а не только общий текст.
+После получения этих участков можно подготовить один исправленный BUILD8.ps1, который сделает резервную копию, исправит обе подсистемы и заново соберёт EXE.
+
+файл большой поэтому прикрепил
+FIX_INPUT.txt
+GPT-5.6 Sol
+GPT-5.6 Sol
+Размышление
+
+
+
+
+
+
+Причины подтверждены:
+
+Spaceship: программа не добавляет обязательные take и skip. Прав DNS Records Read/Write достаточно, расширять доступ не нужно.
+ISPmanager: exists(name) ошибочно считается фатальной ошибкой.
+Проверка MySQL выполняется один раз сразу после создания БД. Добавим 20 попыток с паузой и вывод реальной ошибки подключения.
+Повторный запуск сможет использовать уже созданную БД и продолжить импорт.
+Закройте программу TextFileProcessor.exe, затем запустите Windows PowerShell от имени администратора и вставьте весь блок:
+
+$ErrorActionPreference = 'Stop'
+
+$project = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$script  = Join-Path $project 'BUILD8.ps1'
+
+$content = @'
+#requires -Version 7.0
+
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+
+$ProjectRoot = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$ProjectFile = Join-Path $ProjectRoot 'TextFileProcessor.csproj'
+$DatabaseFile = Join-Path $ProjectRoot 'Services\DatabaseDeploymentService.cs'
+$Build7SourceFile = Join-Path $ProjectRoot 'MainWindow.Build7.cs'
+$Build7GeneratorFile = Join-Path $ProjectRoot 'BUILD7.ps1'
+$PublishDirectory = Join-Path $ProjectRoot 'publish\win-x64'
+
+function Write-Step {
+    param([string]$Text)
+
+    Write-Host "`n=== $Text ===" -ForegroundColor Cyan
+}
+
+function Assert-File {
+    param([string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Файл не найден: $Path"
+    }
+}
+
+function Save-Utf8 {
+    param(
+        [string]$Path,
+        [string]$Content
+    )
+
+    Set-Content `
+        -LiteralPath $Path `
+        -Value $Content `
+        -Encoding UTF8
+}
+
+Write-Step 'Проверка проекта'
+
+Assert-File $ProjectFile
+Assert-File $DatabaseFile
+Assert-File $Build7SourceFile
+Assert-File $Build7GeneratorFile
+
+$running = @(
+    Get-Process -Name 'TextFileProcessor' `
+        -ErrorAction SilentlyContinue
+)
+
+if ($running.Count -gt 0) {
+    throw @'
+TextFileProcessor.exe сейчас запущен.
+
+Закройте программу и повторно запустите BUILD8.ps1.
+'@
+}
+
+$dotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue
+
+if ($null -eq $dotnet) {
+    throw 'dotnet.exe не найден в PATH.'
+}
+
+Write-Host ".NET SDK: $(& dotnet.exe --version)"
+
+Write-Step 'Создание резервной копии'
+
+$timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$backup = Join-Path $ProjectRoot ".build8-backup-$timestamp"
+
+New-Item `
+    -ItemType Directory `
+    -Path (Join-Path $backup 'Services') `
+    -Force | Out-Null
+
+Copy-Item `
+    -LiteralPath $DatabaseFile `
+    -Destination (Join-Path $backup 'Services\DatabaseDeploymentService.cs')
+
+Copy-Item `
+    -LiteralPath $Build7SourceFile `
+    -Destination (Join-Path $backup 'MainWindow.Build7.cs')
+
+Copy-Item `
+    -LiteralPath $Build7GeneratorFile `
+    -Destination (Join-Path $backup 'BUILD7.ps1')
+
+Write-Host "Резервная копия: $backup" -ForegroundColor Green
+
+Write-Step 'Исправление Spaceship API'
+
+$spaceshipOld = @'
+        var baseUrl = settings.BaseUrl.TrimEnd('/');
+        var requestUrl = baseUrl + "/" + relativePath;
+'@
+
+$spaceshipNew = @'
+        var baseUrl = settings.BaseUrl.TrimEnd('/');
+        var requestUrl = baseUrl + "/" + relativePath;
+
+        // Spaceship требует обязательные параметры пагинации
+        // для чтения DNS-записей.
+        var paginationSeparator =
+            requestUrl.Contains('?') ? "&" : "?";
+
+        requestUrl +=
+            paginationSeparator + "take=100&skip=0";
+'@
+
+foreach ($file in @($Build7SourceFile, $Build7GeneratorFile)) {
+    $text = Get-Content `
+        -LiteralPath $file `
+        -Raw `
+        -Encoding UTF8
+
+    if ($text.Contains('paginationSeparator + "take=100&skip=0"')) {
+        Write-Host "Spaceship уже исправлен: $file" `
+            -ForegroundColor Yellow
+
+        continue
+    }
+
+    if (-not $text.Contains($spaceshipOld)) {
+        throw "В файле не найден блок URL Spaceship: $file"
+    }
+
+    $text = $text.Replace(
+        $spaceshipOld,
+        $spaceshipNew)
+
+    Save-Utf8 -Path $file -Content $text
+
+    Write-Host "Исправлен: $file" -ForegroundColor Green
+}
+
+Write-Step 'Исправление создания и проверки БД'
+
+$databaseText = Get-Content `
+    -LiteralPath $DatabaseFile `
+    -Raw `
+    -Encoding UTF8
+
+$databasePattern = @'
+(?s)DATABASE_CREATED=0\r?\n.*?(?=\r?\n"\$DB_CLIENT"\s*\\\r?\n\s*--default-character-set=utf8mb4)
+'@
+
+$databaseReplacement = @'
+DATABASE_CREATED=0
+
+# Сначала проверяем, доступна ли уже существующая БД
+# с реквизитами из config.php.
+if "$DB_CLIENT" \
+    --user="$DATABASE_USER" \
+    --database="$DATABASE_NAME" \
+    --connect-timeout=5 \
+    --execute="SELECT 1" \
+    >/dev/null 2>&1
+then
+    echo "DATABASE_ALREADY_AVAILABLE"
+else
+    CREATE_OUTPUT="$(
+        /usr/local/mgr5/sbin/mgrctl \
+            -m ispmgr \
+            db.edit \
+            name="$DATABASE_NAME" \
+            owner="$DATABASE_OWNER" \
+            server="MySQL" \
+            charset="utf8mb4" \
+            user="*" \
+            username="$DATABASE_USER" \
+            password="$DB_PASSWORD" \
+            confirm="$DB_PASSWORD" \
+            hide_remote_access=on \
+            remote_access=off \
+            sok=ok 2>&1
+    )"
+
+    CREATE_STATUS=$?
+
+    if [ "$CREATE_STATUS" -eq 0 ]; then
+        DATABASE_CREATED=1
+        echo "DATABASE_CREATED"
+    else
+        case "$CREATE_OUTPUT" in
+            *"exists(name)"*|*"already exists"*|*"already_exists"*)
+                echo "DATABASE_ALREADY_EXISTS"
+                printf '%s\n' "$CREATE_OUTPUT" >&2
+                ;;
+            *)
+                printf '%s\n' "$CREATE_OUTPUT" >&2
+                echo "ISPmanager не создал базу данных." >&2
+                exit "$CREATE_STATUS"
+                ;;
+        esac
+    fi
+fi
+
+# ISPmanager может создать БД и пользователя не мгновенно.
+# Ожидаем до 60 секунд, сохраняя последнюю ошибку клиента.
+DB_READY=0
+DB_ATTEMPT=1
+LAST_DB_ERROR=""
+
+while [ "$DB_ATTEMPT" -le 20 ]; do
+    LAST_DB_ERROR="$(
+        "$DB_CLIENT" \
+            --user="$DATABASE_USER" \
+            --database="$DATABASE_NAME" \
+            --connect-timeout=5 \
+            --execute="SELECT 1" 2>&1
+    )"
+
+    DB_STATUS=$?
+
+    if [ "$DB_STATUS" -eq 0 ]; then
+        DB_READY=1
+        echo "DATABASE_CONNECTION_OK"
+        break
+    fi
+
+    echo "Ожидание готовности БД: попытка $DB_ATTEMPT из 20." >&2
+    sleep 3
+    DB_ATTEMPT=$((DB_ATTEMPT + 1))
+done
+
+if [ "$DB_READY" -ne 1 ]; then
+    echo "БД существует, но подключение с реквизитами config.php не удалось." >&2
+
+    if [ -n "$LAST_DB_ERROR" ]; then
+        printf 'Ошибка клиента MySQL: %s\n' "$LAST_DB_ERROR" >&2
+    fi
+
+    echo "Проверьте имя пользователя и пароль БД в config.php." >&2
+    exit 41
+fi
+'@
+
+$databaseRegex = [regex]::new(
+    $databasePattern,
+    [System.Text.RegularExpressions.RegexOptions]::Singleline)
+
+$matches = $databaseRegex.Matches($databaseText)
+
+if ($matches.Count -ne 1) {
+    throw (
+        "Не удалось однозначно найти блок создания БД. " +
+        "Число совпадений: $($matches.Count)"
+    )
+}
+
+$databaseText = $databaseRegex.Replace(
+    $databaseText,
+    $databaseReplacement,
+    1)
+
+Save-Utf8 `
+    -Path $DatabaseFile `
+    -Content $databaseText
+
+Write-Host 'Исправлены:' -ForegroundColor Green
+Write-Host '  - обработка exists(name)'
+Write-Host '  - ожидание готовности БД'
+Write-Host '  - диагностическое сообщение MySQL'
+Write-Host '  - продолжение импорта существующей БД'
+
+Write-Step 'Проверка внесённых изменений'
+
+$checkDatabase = Get-Content `
+    -LiteralPath $DatabaseFile `
+    -Raw `
+    -Encoding UTF8
+
+$checkSpaceship = Get-Content `
+    -LiteralPath $Build7SourceFile `
+    -Raw `
+    -Encoding UTF8
+
+if (-not $checkDatabase.Contains('DATABASE_ALREADY_EXISTS')) {
+    throw 'Проверка исправления exists(name) не пройдена.'
+}
+
+if (-not $checkDatabase.Contains('DB_ATTEMPT=1')) {
+    throw 'Проверка повторных подключений к БД не пройдена.'
+}
+
+if (-not $checkDatabase.Contains('password="$DB_PASSWORD"')) {
+    throw 'Пароль не передаётся в команду ISPmanager должным образом.'
+}
+
+if (-not $checkSpaceship.Contains('take=100&skip=0')) {
+    throw 'Проверка параметров Spaceship не пройдена.'
+}
+
+Write-Host 'Все изменения подтверждены.' -ForegroundColor Green
+
+Write-Step 'Очистка предыдущей сборки'
+
+foreach ($directory in @(
+    (Join-Path $ProjectRoot 'bin'),
+    (Join-Path $ProjectRoot 'obj'),
+    $PublishDirectory
+)) {
+    if (Test-Path -LiteralPath $directory) {
+        Remove-Item `
+            -LiteralPath $directory `
+            -Recurse `
+            -Force
+    }
+}
+
+Push-Location $ProjectRoot
+
+try {
+    Write-Step 'Восстановление NuGet-пакетов'
+
+    & dotnet.exe restore `
+        $ProjectFile `
+        --runtime win-x64
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet restore завершился кодом $LASTEXITCODE"
+    }
+
+    Write-Step 'Проверочная сборка Release x64'
+
+    & dotnet.exe build `
+        $ProjectFile `
+        --configuration Release `
+        --runtime win-x64 `
+        --no-restore
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet build завершился кодом $LASTEXITCODE"
+    }
+
+    Write-Step 'Публикация Windows x64'
+
+    & dotnet.exe publish `
+        $ProjectFile `
+        --configuration Release `
+        --runtime win-x64 `
+        --self-contained true `
+        --no-restore `
+        --output $PublishDirectory
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet publish завершился кодом $LASTEXITCODE"
+    }
+}
+finally {
+    Pop-Location
+}
+
+$exe = Join-Path $PublishDirectory 'TextFileProcessor.exe'
+
+if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+    throw "После публикации EXE не найден: $exe"
+}
+
+Write-Step 'ГОТОВО'
+
+Write-Host 'Исправленная программа:' -ForegroundColor Green
+Write-Host $exe -ForegroundColor White
+
+Write-Host "`nРезервная копия:" -ForegroundColor Green
+Write-Host $backup
+
+Write-Host "`nИсправления BUILD8:" -ForegroundColor Green
+Write-Host '1. Spaceship получает take=100 и skip=0.'
+Write-Host '2. exists(name) больше не останавливает импорт.'
+Write-Host '3. Подключение к новой БД проверяется 20 раз.'
+Write-Host '4. При коде 41 показывается настоящая ошибка MySQL.'
+'@
+
+Set-Content `
+    -LiteralPath $script `
+    -Value $content `
+    -Encoding UTF8
+
+Write-Host "`nСоздан BUILD8:" -ForegroundColor Green
+Write-Host $script -ForegroundColor Cyan
+
+$pwsh = 'C:\Program Files\PowerShell\7\pwsh.exe'
+
+if (-not (Test-Path -LiteralPath $pwsh -PathType Leaf)) {
+    throw "Не найден PowerShell 7: $pwsh"
+}
+
+& $pwsh `
+    -NoLogo `
+    -NoProfile `
+    -ExecutionPolicy Bypass `
+    -File $script
+
+if ($LASTEXITCODE -ne 0) {
+    throw "BUILD8 завершился кодом $LASTEXITCODE"
+}
+
+После сообщения === ГОТОВО === запускайте только новый файл:
+
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\publish\win-x64\TextFileProcessor.exe
+
+Как проверить
+Базу, которая сейчас существует, пока не удаляйте.
+Выберите соответствующее задание.
+Нажмите «Создать БД и импортировать SQL».
+Программа должна:
+обнаружить существующую БД;
+проверить пароль из config.php;
+импортировать SQL.
+Нажмите «Проверить Spaceship API» — ошибки про take и skip уже быть не должно.
+Если существующая БД была создана с другим паролем, BUILD8 теперь не замаскирует это общей фразой: после 20 попыток будет показана настоящая ошибка MySQL, например Access denied. В таком случае нужно будет синхронизировать пароль пользователя БД с config.php, а не расширять права Spaceship.
+
+>> $checkSpaceship = Get-Content `
+>> -LiteralPath $Build7SourceFile `
+>> -Raw `
+>> -Encoding UTF8
+>>
+>> if (-not $checkDatabase.Contains('DATABASE_ALREADY_EXISTS')) {
+>> throw 'Проверка исправления exists(name) не пройдена.'
+>> }
+>>
+>> if (-not $checkDatabase.Contains('DB_ATTEMPT=1')) {
+>> throw 'Проверка повторных подключений к БД не пройдена.'
+>> ...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+PowerShell сейчас находится в режиме незавершённой многострочной команды — поэтому показывает >>. Команда не выполнилась.
+
+Причина: во внешнем блоке $content = @' ... '@ оказался внутренний here-string с такими же ограничителями:
+
+throw @'
+...
+'@
+
+Внутренний '@ преждевременно завершил внешний текстовый блок.
+
+Что сделать
+Нажмите:
+Ctrl+C
+
+Должно снова появиться обычное приглашение:
+
+PS C:\...>
+
+В исходном большом блоке найдите:
+if ($running.Count -gt 0) {
+    throw @'
+TextFileProcessor.exe сейчас запущен.
+
+Закройте программу и повторно запустите BUILD8.ps1.
+'@
+}
+
+Замените его на безопасный вариант без вложенного here-string:
+if ($running.Count -gt 0) {
+    throw "TextFileProcessor.exe сейчас запущен. Закройте программу и повторно запустите BUILD8.ps1."
+}
+
+После этого вставьте весь исправленный блок заново, начиная с:
+$ErrorActionPreference = 'Stop'
+
+Не продолжайте ввод после текущих >>: сначала обязательно нажмите Ctrl+C.
+
+Если файл BUILD8.ps1 успел появиться после неудачной попытки, удалять его необязательно — исправленный запуск перезапишет файл. Проверить его наличие можно так:
+
+Test-Path 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1'
+
+Но запускать старый BUILD8.ps1 до повторного корректного создания не следует.
+
+пришли полный код чтоб не ошибавться
+GPT-5.6 Sol
+GPT-5.6 Sol
+Размышление
+
+
+
+
+
+Ниже — полный исправленный код без вложенного блока, из-за которого PowerShell зависал на >>.
+
+Порядок запуска
+В текущем окне нажмите Ctrl+C.
+Убедитесь, что появилось обычное приглашение PS C:\...>.
+Закройте TextFileProcessor.exe.
+Вставьте весь блок целиком в PowerShell 7 от имени администратора.
+Во время вставки PowerShell может кратковременно показывать >> внутри текстовых блоков — это нормально. После вставки последней строки скрипт начнёт выполняться.
+
+#requires -Version 7.0
+
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+
+$ProjectRoot = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$ProjectFile = Join-Path $ProjectRoot 'TextFileProcessor.csproj'
+$DatabaseFile = Join-Path $ProjectRoot 'Services\DatabaseDeploymentService.cs'
+$Build7SourceFile = Join-Path $ProjectRoot 'MainWindow.Build7.cs'
+$Build7GeneratorFile = Join-Path $ProjectRoot 'BUILD7.ps1'
+$PublishDirectory = Join-Path $ProjectRoot 'publish\win-x64'
+
+function Write-Step {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Text
+    )
+
+    Write-Host "`n=== $Text ===" -ForegroundColor Cyan
+}
+
+function Assert-File {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Файл не найден: $Path"
+    }
+}
+
+function Save-Utf8 {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+
+        [Parameter(Mandatory)]
+        [string]$Content
+    )
+
+    Set-Content `
+        -LiteralPath $Path `
+        -Value $Content `
+        -Encoding UTF8
+}
+
+Write-Step 'Проверка проекта'
+
+Assert-File -Path $ProjectFile
+Assert-File -Path $DatabaseFile
+Assert-File -Path $Build7SourceFile
+Assert-File -Path $Build7GeneratorFile
+
+$running = @(
+    Get-Process `
+        -Name 'TextFileProcessor' `
+        -ErrorAction SilentlyContinue
+)
+
+if ($running.Count -gt 0) {
+    throw 'TextFileProcessor.exe сейчас запущен. Закройте программу и повторно запустите скрипт.'
+}
+
+$dotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue
+
+if ($null -eq $dotnet) {
+    throw 'dotnet.exe не найден. Установите .NET SDK или добавьте dotnet.exe в PATH.'
+}
+
+$dotnetVersion = & dotnet.exe --version
+
+if ($LASTEXITCODE -ne 0) {
+    throw 'Не удалось определить версию .NET SDK.'
+}
+
+Write-Host "Корень проекта: $ProjectRoot"
+Write-Host ".NET SDK: $dotnetVersion" -ForegroundColor Green
+
+Write-Step 'Создание резервной копии'
+
+$timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$backup = Join-Path $ProjectRoot ".build8-backup-$timestamp"
+$backupServices = Join-Path $backup 'Services'
+
+New-Item `
+    -ItemType Directory `
+    -Path $backupServices `
+    -Force | Out-Null
+
+Copy-Item `
+    -LiteralPath $DatabaseFile `
+    -Destination (Join-Path $backupServices 'DatabaseDeploymentService.cs') `
+    -Force
+
+Copy-Item `
+    -LiteralPath $Build7SourceFile `
+    -Destination (Join-Path $backup 'MainWindow.Build7.cs') `
+    -Force
+
+Copy-Item `
+    -LiteralPath $Build7GeneratorFile `
+    -Destination (Join-Path $backup 'BUILD7.ps1') `
+    -Force
+
+Write-Host "Резервная копия создана:" -ForegroundColor Green
+Write-Host $backup
+
+Write-Step 'Исправление Spaceship API'
+
+$spaceshipOld = @'
+        var baseUrl = settings.BaseUrl.TrimEnd('/');
+        var requestUrl = baseUrl + "/" + relativePath;
+'@
+
+$spaceshipNew = @'
+        var baseUrl = settings.BaseUrl.TrimEnd('/');
+        var requestUrl = baseUrl + "/" + relativePath;
+
+        // Spaceship требует параметры пагинации при чтении DNS-записей.
+        var paginationSeparator =
+            requestUrl.Contains('?') ? "&" : "?";
+
+        requestUrl +=
+            paginationSeparator + "take=100&skip=0";
+'@
+
+foreach ($file in @(
+    $Build7SourceFile,
+    $Build7GeneratorFile
+)) {
+    $text = Get-Content `
+        -LiteralPath $file `
+        -Raw `
+        -Encoding UTF8
+
+    if ($text.Contains('paginationSeparator + "take=100&skip=0"')) {
+        Write-Host "Исправление Spaceship уже присутствует:" -ForegroundColor Yellow
+        Write-Host $file
+        continue
+    }
+
+    if (-not $text.Contains($spaceshipOld)) {
+        throw "Не найден ожидаемый блок формирования URL Spaceship в файле: $file"
+    }
+
+    $text = $text.Replace(
+        $spaceshipOld,
+        $spaceshipNew
+    )
+
+    Save-Utf8 `
+        -Path $file `
+        -Content $text
+
+    Write-Host "Исправлен файл:" -ForegroundColor Green
+    Write-Host $file
+}
+
+Write-Step 'Исправление создания и проверки базы данных'
+
+$databaseText = Get-Content `
+    -LiteralPath $DatabaseFile `
+    -Raw `
+    -Encoding UTF8
+
+if ($databaseText.Contains('DATABASE_CONNECTION_OK') -and
+    $databaseText.Contains('DATABASE_ALREADY_EXISTS') -and
+    $databaseText.Contains('DB_ATTEMPT=1')) {
+
+    Write-Host 'Исправление базы данных уже присутствует.' -ForegroundColor Yellow
+}
+else {
+    $databasePattern = @'
+(?s)DATABASE_CREATED=0\r?\n.*?(?=\r?\n"\$DB_CLIENT"\s*\\\r?\n\s*--default-character-set=utf8mb4)
+'@
+
+    $databaseReplacement = @'
+DATABASE_CREATED=0
+
+# Сначала проверяем, доступна ли существующая база данных
+# с реквизитами, полученными из config.php.
+if "$DB_CLIENT" \
+    --user="$DATABASE_USER" \
+    --database="$DATABASE_NAME" \
+    --connect-timeout=5 \
+    --execute="SELECT 1" \
+    >/dev/null 2>&1
+then
+    echo "DATABASE_ALREADY_AVAILABLE"
+else
+    CREATE_OUTPUT=""
+    CREATE_STATUS=0
+
+    if CREATE_OUTPUT="$(
+        /usr/local/mgr5/sbin/mgrctl \
+            -m ispmgr \
+            db.edit \
+            name="$DATABASE_NAME" \
+            owner="$DATABASE_OWNER" \
+            server="MySQL" \
+            charset="utf8mb4" \
+            user="*" \
+            username="$DATABASE_USER" \
+            password="$DB_PASSWORD" \
+            confirm="$DB_PASSWORD" \
+            hide_remote_access=on \
+            remote_access=off \
+            sok=ok 2>&1
+    )"
+    then
+        DATABASE_CREATED=1
+        echo "DATABASE_CREATED"
+    else
+        CREATE_STATUS=$?
+
+        case "$CREATE_OUTPUT" in
+            *"exists(name)"*|*"already exists"*|*"already_exists"*)
+                echo "DATABASE_ALREADY_EXISTS"
+                printf '%s\n' "$CREATE_OUTPUT" >&2
+                ;;
+            *)
+                printf '%s\n' "$CREATE_OUTPUT" >&2
+                echo "ISPmanager не создал базу данных." >&2
+                exit "$CREATE_STATUS"
+                ;;
+        esac
+    fi
+fi
+
+# ISPmanager может создать базу и пользователя не мгновенно.
+# Выполняем до 20 проверок с паузой 3 секунды.
+DB_READY=0
+DB_ATTEMPT=1
+LAST_DB_ERROR=""
+
+while [ "$DB_ATTEMPT" -le 20 ]; do
+    LAST_DB_ERROR=""
+
+    if LAST_DB_ERROR="$(
+        "$DB_CLIENT" \
+            --user="$DATABASE_USER" \
+            --database="$DATABASE_NAME" \
+            --connect-timeout=5 \
+            --execute="SELECT 1" 2>&1
+    )"
+    then
+        DB_READY=1
+        echo "DATABASE_CONNECTION_OK"
+        break
+    else
+        DB_STATUS=$?
+    fi
+
+    echo "Ожидание готовности БД: попытка $DB_ATTEMPT из 20." >&2
+
+    if [ -n "$LAST_DB_ERROR" ]; then
+        printf 'MySQL: %s\n' "$LAST_DB_ERROR" >&2
+    fi
+
+    if [ "$DB_ATTEMPT" -lt 20 ]; then
+        sleep 3
+    fi
+
+    DB_ATTEMPT=$((DB_ATTEMPT + 1))
+done
+
+if [ "$DB_READY" -ne 1 ]; then
+    echo "База существует, но подключение с реквизитами config.php не удалось." >&2
+
+    if [ -n "$LAST_DB_ERROR" ]; then
+        printf 'Последняя ошибка MySQL: %s\n' "$LAST_DB_ERROR" >&2
+    fi
+
+    echo "Проверьте имя пользователя и пароль базы данных в config.php." >&2
+    exit 41
+fi
+'@
+
+    $databaseRegex = [regex]::new(
+        $databasePattern,
+        [System.Text.RegularExpressions.RegexOptions]::Singleline
+    )
+
+    $databaseMatches = $databaseRegex.Matches($databaseText)
+
+    if ($databaseMatches.Count -ne 1) {
+        throw (
+            'Не удалось однозначно найти старый блок создания БД. ' +
+            "Количество найденных блоков: $($databaseMatches.Count). " +
+            "Исходные файлы сохранены в резервной копии: $backup"
+        )
+    }
+
+    $replacementEvaluator = [System.Text.RegularExpressions.MatchEvaluator] {
+        param($match)
+
+        return $databaseReplacement
+    }
+
+    $databaseText = $databaseRegex.Replace(
+        $databaseText,
+        $replacementEvaluator,
+        1
+    )
+
+    Save-Utf8 `
+        -Path $DatabaseFile `
+        -Content $databaseText
+
+    Write-Host 'Исправлен файл:' -ForegroundColor Green
+    Write-Host $DatabaseFile
+}
+
+Write-Step 'Проверка внесённых изменений'
+
+$checkDatabase = Get-Content `
+    -LiteralPath $DatabaseFile `
+    -Raw `
+    -Encoding UTF8
+
+$checkBuild7Source = Get-Content `
+    -LiteralPath $Build7SourceFile `
+    -Raw `
+    -Encoding UTF8
+
+$checkBuild7Generator = Get-Content `
+    -LiteralPath $Build7GeneratorFile `
+    -Raw `
+    -Encoding UTF8
+
+$requiredDatabaseMarkers = @(
+    'DATABASE_ALREADY_EXISTS',
+    'DATABASE_CONNECTION_OK',
+    'DB_ATTEMPT=1',
+    'password="$DB_PASSWORD"',
+    'Последняя ошибка MySQL',
+    'exit 41'
+)
+
+foreach ($marker in $requiredDatabaseMarkers) {
+    if (-not $checkDatabase.Contains($marker)) {
+        throw "Проверка базы данных не пройдена. Не найден маркер: $marker"
+    }
+}
+
+if (-not $checkBuild7Source.Contains('take=100&skip=0')) {
+    throw 'Проверка Spaceship в MainWindow.Build7.cs не пройдена.'
+}
+
+if (-not $checkBuild7Generator.Contains('take=100&skip=0')) {
+    throw 'Проверка Spaceship в BUILD7.ps1 не пройдена.'
+}
+
+Write-Host 'Все изменения подтверждены.' -ForegroundColor Green
+
+Write-Step 'Очистка предыдущей сборки'
+
+foreach ($directory in @(
+    (Join-Path $ProjectRoot 'bin'),
+    (Join-Path $ProjectRoot 'obj'),
+    $PublishDirectory
+)) {
+    if (Test-Path -LiteralPath $directory) {
+        Write-Host "Удаление: $directory"
+
+        Remove-Item `
+            -LiteralPath $directory `
+            -Recurse `
+            -Force
+    }
+}
+
+Push-Location $ProjectRoot
+
+try {
+    Write-Step 'Восстановление NuGet-пакетов'
+
+    & dotnet.exe restore `
+        $ProjectFile `
+        --runtime win-x64
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet restore завершился кодом $LASTEXITCODE"
+    }
+
+    Write-Step 'Проверочная сборка Release x64'
+
+    & dotnet.exe build `
+        $ProjectFile `
+        --configuration Release `
+        --runtime win-x64 `
+        --no-restore
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet build завершился кодом $LASTEXITCODE"
+    }
+
+    Write-Step 'Публикация Windows x64'
+
+    & dotnet.exe publish `
+        $ProjectFile `
+        --configuration Release `
+        --runtime win-x64 `
+        --self-contained true `
+        --no-restore `
+        --output $PublishDirectory
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet publish завершился кодом $LASTEXITCODE"
+    }
+}
+finally {
+    Pop-Location
+}
+
+$exe = Join-Path $PublishDirectory 'TextFileProcessor.exe'
+
+if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+    throw "Публикация завершилась, но EXE не найден: $exe"
+}
+
+Write-Step 'ГОТОВО'
+
+Write-Host 'Исправленная программа:' -ForegroundColor Green
+Write-Host $exe -ForegroundColor White
+
+Write-Host "`nРезервная копия исходных файлов:" -ForegroundColor Green
+Write-Host $backup
+
+Write-Host "`nВнесённые исправления:" -ForegroundColor Green
+Write-Host '1. В запрос Spaceship добавлены take=100 и skip=0.'
+Write-Host '2. Ответ ISPmanager exists(name) больше не останавливает процесс.'
+Write-Host '3. Проверка подключения к БД выполняется до 20 раз.'
+Write-Host '4. При ошибке показывается настоящий ответ клиента MySQL.'
+Write-Host '5. Повторный запуск может продолжить работу с существующей БД.'
+
+После появления:
+
+=== ГОТОВО ===
+
+запускайте новый файл:
+
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\publish\win-x64\TextFileProcessor.exe
+
+Сначала попробуйте импорт с уже созданной базой — удалять её перед проверкой не нужно.
+
+>> throw "Публикация завершилась, но EXE не найден: $exe"
+>> }
+>>
+>> Write-Step 'ГОТОВО'
+>>
+>> Write-Host 'Исправленная программа:' -ForegroundColor Green
+>> Write-Host $exe -ForegroundColor White
+>>
+>> Write-Host "`nРезервная копия исходных файлов:" -ForegroundColor Green
+>> Write-Host $backup
+>>
+>> Write-Host "`nВнесённые исправления:"...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Скрипт запустился нормально, но остановился безопасно: в MainWindow.Build7.cs код отличается от ожидаемого шаблона. Резервная копия создана, сборка не выполнялась.
+
+Сейчас в обычном приглашении PS C:\WINDOWS\system32> вставьте этот блок целиком:
+
+$root = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+
+$files = @(
+    (Join-Path $root 'MainWindow.Build7.cs'),
+    (Join-Path $root 'BUILD7.ps1')
+)
+
+foreach ($file in $files) {
+    Write-Host "`n==================================================" -ForegroundColor Cyan
+    Write-Host "ФАЙЛ: $file" -ForegroundColor Cyan
+    Write-Host "==================================================" -ForegroundColor Cyan
+
+    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
+        Write-Host 'Файл не найден' -ForegroundColor Red
+        continue
+    }
+
+    $lines = Get-Content -LiteralPath $file -Encoding UTF8
+
+    $matches = Select-String `
+        -LiteralPath $file `
+        -Pattern 'Spaceship|baseUrl|requestUrl|relativePath|take=|skip=|dns/records|dns-records' `
+        -CaseSensitive:$false
+
+    if (-not $matches) {
+        Write-Host 'Подходящие строки не найдены.' -ForegroundColor Yellow
+        continue
+    }
+
+    $numbers = foreach ($match in $matches) {
+        $start = [Math]::Max(1, $match.LineNumber - 8)
+        $end = [Math]::Min($lines.Count, $match.LineNumber + 12)
+
+        $start..$end
+    }
+
+    $numbers = $numbers | Sort-Object -Unique
+
+    $previous = 0
+
+    foreach ($number in $numbers) {
+        if ($previous -ne 0 -and $number -gt ($previous + 1)) {
+            Write-Host '--------------------' -ForegroundColor DarkGray
+        }
+
+        '{0,5}: {1}' -f $number, $lines[$number - 1]
+        $previous = $number
+    }
+}
+
+Он ничего не изменяет и ничего не запускает — только покажет нужные части двух файлов с номерами строк.
+
+Пришлите весь полученный вывод. После него можно подготовить точный исправленный BUILD8 без рискованной замены неправильного участка. Не запускайте предыдущий скрипт повторно: он снова остановится на том же месте.
+
+файл тут https://github.com/raliya/kdhGHf643tf76.git имя 11235.txt
+GPT-5.6 Sol
+GPT-5.6 Sol
+Навык активирован: page_content
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+GitHub - raliya/kdhGHf643tf76 · GitHub
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+Размышление
+
+
+Я открыл 11235.txt и увидел точный код. Ошибка предыдущего скрипта возникла из-за различий в переводах строк CRLF/LF, хотя нужный фрагмент действительно присутствует:
+
+var baseUrl = settings.BaseUrl.TrimEnd('/');
+var requestUrl = baseUrl + "/" + relativePath;
+
+Ниже исправленный скрипт: он использует регулярное выражение, создаёт резервные копии, вносит обе правки и собирает программу.
+
+Как запустить
+Закройте TextFileProcessor.exe.
+Откройте Блокнот.
+Скопируйте туда весь код ниже.
+Сохраните как:
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1
+
+В поле «Тип файла» выберите Все файлы, чтобы не получилось BUILD8.ps1.txt.
+
+В PowerShell выполните:
+powershell.exe -ExecutionPolicy Bypass -File "C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1"
+
+Полный код BUILD8.ps1
+#requires -Version 5.1
+
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+
+$ProjectRoot = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+
+$ProjectFile = Join-Path $ProjectRoot 'TextFileProcessor.csproj'
+$DatabaseFile = Join-Path $ProjectRoot 'Services\DatabaseDeploymentService.cs'
+$MainWindowFile = Join-Path $ProjectRoot 'MainWindow.Build7.cs'
+$Build7File = Join-Path $ProjectRoot 'BUILD7.ps1'
+$PublishDirectory = Join-Path $ProjectRoot 'publish\win-x64'
+
+function Write-Step {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Text
+    )
+
+    Write-Host ''
+    Write-Host "=== $Text ===" -ForegroundColor Cyan
+}
+
+function Assert-File {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Не найден файл: $Path"
+    }
+}
+
+function Read-TextFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    return [System.IO.File]::ReadAllText(
+        $Path,
+        [System.Text.Encoding]::UTF8
+    )
+}
+
+function Write-Utf8File {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Content
+    )
+
+    $encoding = New-Object System.Text.UTF8Encoding($false)
+
+    [System.IO.File]::WriteAllText(
+        $Path,
+        $Content,
+        $encoding
+    )
+}
+
+function Add-SpaceshipPagination {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $text = Read-TextFile -Path $Path
+
+    if ($text.Contains('paginationSeparator + "take=100&skip=0"')) {
+        Write-Host "Исправление уже присутствует: $Path" `
+            -ForegroundColor Yellow
+
+        return
+    }
+
+    $pattern = '(?m)^(?<indent>[ \t]*)var baseUrl = settings\.BaseUrl\.TrimEnd%%MATH_INLINE_0%%;[ \t]*\r?\n[ \t]*var requestUrl = baseUrl \+ "/" \+ relativePath;[ \t]*$'
+
+    $regex = New-Object System.Text.RegularExpressions.Regex(
+        $pattern,
+        [System.Text.RegularExpressions.RegexOptions]::Multiline
+    )
+
+    $matches = $regex.Matches($text)
+
+    if ($matches.Count -ne 1) {
+        throw (
+            "Не удалось однозначно найти блок Spaceship в файле: $Path. " +
+            "Найдено совпадений: $($matches.Count)"
+        )
+    }
+
+    $evaluator = [System.Text.RegularExpressions.MatchEvaluator] {
+        param($match)
+
+        $indent = $match.Groups['indent'].Value
+
+        if ($match.Value.Contains("`r`n")) {
+            $newline = "`r`n"
+        }
+        else {
+            $newline = "`n"
+        }
+
+        return (
+            $indent + "var baseUrl = settings.BaseUrl.TrimEnd('/');" +
+            $newline +
+            $indent + 'var requestUrl = baseUrl + "/" + relativePath;' +
+            $newline +
+            $newline +
+            $indent + '// Spaceship API требует параметры пагинации.' +
+            $newline +
+            $indent + 'var paginationSeparator =' +
+            $newline +
+            $indent + '    requestUrl.Contains(''?'') ? "&" : "?";' +
+            $newline +
+            $newline +
+            $indent + 'requestUrl +=' +
+            $newline +
+            $indent + '    paginationSeparator + "take=100&skip=0";'
+        )
+    }
+
+    $updated = $regex.Replace(
+        $text,
+        $evaluator,
+        1
+    )
+
+    if ($updated -eq $text) {
+        throw "Файл не был изменён: $Path"
+    }
+
+    Write-Utf8File `
+        -Path $Path `
+        -Content $updated
+
+    $check = Read-TextFile -Path $Path
+
+    if (-not $check.Contains('paginationSeparator + "take=100&skip=0"')) {
+        throw "Не удалось подтвердить исправление: $Path"
+    }
+
+    Write-Host "Исправлен Spaceship API: $Path" `
+        -ForegroundColor Green
+}
+
+function Fix-DatabaseDeployment {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $text = Read-TextFile -Path $Path
+
+    if (
+        $text.Contains('DATABASE_CONNECTION_OK') -and
+        $text.Contains('DATABASE_ALREADY_EXISTS') -and
+        $text.Contains('DB_ATTEMPT=1')
+    ) {
+        Write-Host 'Исправление базы данных уже присутствует.' `
+            -ForegroundColor Yellow
+
+        return
+    }
+
+    $pattern = '(?ms)^DATABASE_CREATED=0[ \t]*\r?\n.*?(?=^"\$DB_CLIENT"[ \t]*\\[ \t]*\r?\n[ \t]*--default-character-set=utf8mb4)'
+
+    $regex = New-Object System.Text.RegularExpressions.Regex(
+        $pattern,
+        (
+            [System.Text.RegularExpressions.RegexOptions]::Multiline `
+            -bor
+            [System.Text.RegularExpressions.RegexOptions]::Singleline
+        )
+    )
+
+    $matches = $regex.Matches($text)
+
+    if ($matches.Count -ne 1) {
+        throw (
+            'Не удалось однозначно найти старый блок создания базы данных. ' +
+            "Найдено совпадений: $($matches.Count)"
+        )
+    }
+
+    $replacement = @'
+DATABASE_CREATED=0
+
+# Сначала проверяем, доступна ли существующая база данных.
+if "$DB_CLIENT" \
+    --user="$DATABASE_USER" \
+    --database="$DATABASE_NAME" \
+    --connect-timeout=5 \
+    --execute="SELECT 1" \
+    >/dev/null 2>&1
+then
+    echo "DATABASE_ALREADY_AVAILABLE"
+else
+    CREATE_OUTPUT="$(
+        /usr/local/mgr5/sbin/mgrctl \
+            -m ispmgr \
+            db.edit \
+            name="$DATABASE_NAME" \
+            owner="$DATABASE_OWNER" \
+            server="MySQL" \
+            charset="utf8mb4" \
+            user="*" \
+            username="$DATABASE_USER" \
+            -e 'password=$DB_PASSWORD' \
+            -e 'confirm=$DB_PASSWORD' \
+            hide_remote_access=on \
+            remote_access=off \
+            sok=ok 2>&1
+    )"
+
+    CREATE_STATUS=$?
+
+    if [ "$CREATE_STATUS" -eq 0 ]; then
+        DATABASE_CREATED=1
+        echo "DATABASE_CREATED"
+    else
+        case "$CREATE_OUTPUT" in
+            *"exists(name)"*|*"already exists"*|*"already_exists"*)
+                echo "DATABASE_ALREADY_EXISTS"
+                printf '%s\n' "$CREATE_OUTPUT" >&2
+                ;;
+            *)
+                printf '%s\n' "$CREATE_OUTPUT" >&2
+                echo "ISPmanager не создал базу данных." >&2
+                exit "$CREATE_STATUS"
+                ;;
+        esac
+    fi
+fi
+
+# Создание базы и пользователя может завершаться не мгновенно.
+# Проверяем подключение до 20 раз с паузой 3 секунды.
+DB_READY=0
+DB_ATTEMPT=1
+LAST_DB_ERROR=""
+
+while [ "$DB_ATTEMPT" -le 20 ]; do
+    LAST_DB_ERROR="$(
+        "$DB_CLIENT" \
+            --user="$DATABASE_USER" \
+            --database="$DATABASE_NAME" \
+            --connect-timeout=5 \
+            --execute="SELECT 1" 2>&1
+    )"
+
+    DB_STATUS=$?
+
+    if [ "$DB_STATUS" -eq 0 ]; then
+        DB_READY=1
+        echo "DATABASE_CONNECTION_OK"
+        break
+    fi
+
+    echo "Ожидание готовности БД: попытка $DB_ATTEMPT из 20." >&2
+
+    if [ -n "$LAST_DB_ERROR" ]; then
+        printf 'MySQL: %s\n' "$LAST_DB_ERROR" >&2
+    fi
+
+    if [ "$DB_ATTEMPT" -lt 20 ]; then
+        sleep 3
+    fi
+
+    DB_ATTEMPT=$((DB_ATTEMPT + 1))
+done
+
+if [ "$DB_READY" -ne 1 ]; then
+    echo "Подключение к базе данных не удалось." >&2
+
+    if [ -n "$LAST_DB_ERROR" ]; then
+        printf 'Последняя ошибка MySQL: %s\n' "$LAST_DB_ERROR" >&2
+    fi
+
+    echo "Проверьте имя базы, пользователя и пароль в config.php." >&2
+    exit 41
+fi
+'@
+
+    if ($matches[0].Value.Contains("`r`n")) {
+        $replacement = $replacement.Replace(
+            "`n",
+            "`r`n"
+        )
+    }
+
+    $evaluator = [System.Text.RegularExpressions.MatchEvaluator] {
+        param($match)
+
+        return $replacement
+    }
+
+    $updated = $regex.Replace(
+        $text,
+        $evaluator,
+        1
+    )
+
+    if ($updated -eq $text) {
+        throw 'Файл DatabaseDeploymentService.cs не был изменён.'
+    }
+
+    Write-Utf8File `
+        -Path $Path `
+        -Content $updated
+
+    $check = Read-TextFile -Path $Path
+
+    $markers = @(
+        'DATABASE_ALREADY_EXISTS',
+        'DATABASE_CONNECTION_OK',
+        'DB_ATTEMPT=1',
+        'LAST_DB_ERROR',
+        'exit 41'
+    )
+
+    foreach ($marker in $markers) {
+        if (-not $check.Contains($marker)) {
+            throw "После исправления не найден маркер: $marker"
+        }
+    }
+
+    Write-Host "Исправлено создание базы данных: $Path" `
+        -ForegroundColor Green
+}
+
+try {
+    Write-Step 'Проверка файлов'
+
+    Assert-File -Path $ProjectFile
+    Assert-File -Path $DatabaseFile
+    Assert-File -Path $MainWindowFile
+    Assert-File -Path $Build7File
+
+    $dotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue
+
+    if ($null -eq $dotnet) {
+        throw 'dotnet.exe не найден.'
+    }
+
+    $running = @(
+        Get-Process `
+            -Name 'TextFileProcessor' `
+            -ErrorAction SilentlyContinue
+    )
+
+    if ($running.Count -gt 0) {
+        throw 'Закройте TextFileProcessor.exe и повторите запуск.'
+    }
+
+    $dotnetVersion = & dotnet.exe --version
+
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Не удалось определить версию .NET SDK.'
+    }
+
+    Write-Host "Проект: $ProjectRoot"
+    Write-Host ".NET SDK: $dotnetVersion" -ForegroundColor Green
+
+    Write-Step 'Создание резервной копии'
+
+    $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $backupDirectory = Join-Path `
+        $ProjectRoot `
+        ".build8-backup-$timestamp"
+
+    $backupServices = Join-Path `
+        $backupDirectory `
+        'Services'
+
+    New-Item `
+        -ItemType Directory `
+        -Path $backupServices `
+        -Force | Out-Null
+
+    Copy-Item `
+        -LiteralPath $MainWindowFile `
+        -Destination (Join-Path $backupDirectory 'MainWindow.Build7.cs') `
+        -Force
+
+    Copy-Item `
+        -LiteralPath $Build7File `
+        -Destination (Join-Path $backupDirectory 'BUILD7.ps1') `
+        -Force
+
+    Copy-Item `
+        -LiteralPath $DatabaseFile `
+        -Destination (
+            Join-Path `
+                $backupServices `
+                'DatabaseDeploymentService.cs'
+        ) `
+        -Force
+
+    Write-Host "Резервная копия: $backupDirectory" `
+        -ForegroundColor Green
+
+    Write-Step 'Исправление Spaceship API'
+
+    Add-SpaceshipPagination -Path $MainWindowFile
+    Add-SpaceshipPagination -Path $Build7File
+
+    Write-Step 'Исправление создания базы данных'
+
+    Fix-DatabaseDeployment -Path $DatabaseFile
+
+    Write-Step 'Проверка внесённых изменений'
+
+    $mainWindowCheck = Read-TextFile -Path $MainWindowFile
+    $build7Check = Read-TextFile -Path $Build7File
+    $databaseCheck = Read-TextFile -Path $DatabaseFile
+
+    if (-not $mainWindowCheck.Contains('take=100&skip=0')) {
+        throw 'Исправление отсутствует в MainWindow.Build7.cs.'
+    }
+
+    if (-not $build7Check.Contains('take=100&skip=0')) {
+        throw 'Исправление отсутствует в BUILD7.ps1.'
+    }
+
+    if (-not $databaseCheck.Contains('DATABASE_CONNECTION_OK')) {
+        throw 'Исправление отсутствует в DatabaseDeploymentService.cs.'
+    }
+
+    Write-Host 'Все изменения подтверждены.' `
+        -ForegroundColor Green
+
+    Write-Step 'Очистка предыдущей сборки'
+
+    $directoriesToDelete = @(
+        (Join-Path $ProjectRoot 'bin'),
+        (Join-Path $ProjectRoot 'obj'),
+        $PublishDirectory
+    )
+
+    foreach ($directory in $directoriesToDelete) {
+        if (Test-Path -LiteralPath $directory) {
+            Write-Host "Удаление: $directory"
+
+            Remove-Item `
+                -LiteralPath $directory `
+                -Recurse `
+                -Force
+        }
+    }
+
+    Push-Location $ProjectRoot
+
+    try {
+        Write-Step 'Восстановление пакетов'
+
+        & dotnet.exe restore `
+            $ProjectFile `
+            --runtime win-x64
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "dotnet restore завершился кодом $LASTEXITCODE"
+        }
+
+        Write-Step 'Проверочная сборка'
+
+        & dotnet.exe build `
+            $ProjectFile `
+            --configuration Release `
+            --runtime win-x64 `
+            --no-restore
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "dotnet build завершился кодом $LASTEXITCODE"
+        }
+
+        Write-Step 'Публикация программы'
+
+        & dotnet.exe publish `
+            $ProjectFile `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --no-restore `
+            --output $PublishDirectory
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "dotnet publish завершился кодом $LASTEXITCODE"
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    $exeFile = Join-Path `
+        $PublishDirectory `
+        'TextFileProcessor.exe'
+
+    if (-not (Test-Path -LiteralPath $exeFile -PathType Leaf)) {
+        throw "EXE не найден после публикации: $exeFile"
+    }
+
+    Write-Step 'ГОТОВО'
+
+    Write-Host 'Исправленная программа:' `
+        -ForegroundColor Green
+
+    Write-Host $exeFile -ForegroundColor White
+
+    Write-Host ''
+    Write-Host 'Резервная копия:' `
+        -ForegroundColor Green
+
+    Write-Host $backupDirectory
+
+    Write-Host ''
+    Write-Host 'Внесённые исправления:' `
+        -ForegroundColor Green
+
+    Write-Host '1. В запрос Spaceship добавлены take=100 и skip=0.'
+    Write-Host '2. Ошибка ISPmanager exists(name) больше не останавливает процесс.'
+    Write-Host '3. Подключение к базе проверяется до 20 раз.'
+    Write-Host '4. При ошибке отображается ответ клиента MySQL.'
+}
+catch {
+    Write-Host ''
+    Write-Host '=== ОШИБКА ===' -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Red
+
+    if ($null -ne $_.InvocationInfo) {
+        Write-Host (
+            'Строка скрипта: ' +
+            $_.InvocationInfo.ScriptLineNumber
+        ) -ForegroundColor Yellow
+    }
+
+    Write-Host ''
+    Write-Host 'Сборка остановлена. Существующий EXE не удаляйте.' `
+        -ForegroundColor Yellow
+
+    exit 1
+}
+
+При успешном завершении появится:
+
+=== ГОТОВО ===
+Исправленная программа:
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\publish\win-x64\TextFileProcessor.exe
+
+>> при непосредственной вставке многострочного кода в PowerShell означает, что консоль ожидает завершения блока. Поэтому надёжнее сохранить код через Блокнот и запустить командой -File, как указано выше.
+
+PS C:\WINDOWS\system32> powershell.exe -ExecutionPolicy Bypass -File "C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1"
+>>
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1:31 знак:36
++ throw "РќРµ РЅР°Р№РґРµРЅ С„Р°Р№Р»: $Path"
++ ~~~~~~~
+Непредвиденная лексема "Р°Р№Р»:" в выражении или операторе.
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1:73 знак:56
++ if ($...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Размышление
+
+
+
+
+Файл сохранён как UTF‑8 без BOM, а также в нём испорчен фрагмент \(''/''\).
+
+Вставьте в текущее окно PowerShell одной строкой и нажмите Enter:
+
+$p='C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1'; $s=[System.IO.File]::ReadAllText($p,[System.Text.Encoding]::UTF8); $s=$s.Replace('%%MATH_INLINE_0%%','%%MATH_INLINE_0%%'); [System.IO.File]::WriteAllText($p,$s,(New-Object System.Text.UTF8Encoding($true))); powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p
+
+Команда:
+
+исправит повреждённый фрагмент;
+пересохранит BUILD8.ps1 как UTF‑8 с BOM;
+сразу запустит скрипт.
+Если снова появится ошибка, пришлите первую ошибку целиком, не весь список.
+
+PS C:\WINDOWS\system32> $p='C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1'; $s=[System.IO.File]::ReadAllText($p,[System.Text.Encoding]::UTF8); $s=$s.Replace('%%MATH_INLINE_0%%','%%MATH_INLINE_0%%'); [System.IO.File]::WriteAllText($p,$s,(New-Object System.Text.UTF8Encoding($true))); powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p
+>>
+
+=== Проверка файлов ===
+Проект: C:\Users\User\Desktop\Adminki\. Программа домен...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Вы заменили маркер сам на себя, поэтому шаблон остался повреждённым. Выполните точно эту одну строку — нужная последовательность собирается из символов, чтобы она снова не исказилась:
+
+$p='C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1'; $s=[IO.File]::ReadAllText($p); $token='%%'+'MATH_INLINE_0'+'%%'; $replacement=(-join @([char]92,[char]40,"''/''",[char]92,[char]41)); if(-not $s.Contains($token)){throw "Маркер в BUILD8.ps1 не найден"}; $s=$s.Replace($token,$replacement); [IO.File]::WriteAllText($p,$s,(New-Object Text.UTF8Encoding($true))); powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p
+
+Она реально заменит повреждённый маркер на корректную часть регулярного выражения и повторно запустит сборку. Ранее созданная резервная копия не мешает.
+
+PS C:\WINDOWS\system32> $p='C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD8.ps1'; $s=[System.IO.File]::ReadAllText($p,[System.Text.Encoding]::UTF8); $s=$s.Replace('%%MATH_INLINE_0%%','%%MATH_INLINE_0%%'); [System.IO.File]::WriteAllText($p,$s,(New-Object System.Text.UTF8Encoding($true))); powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p
+>>
+
+=== Проверка файлов ===
+Проект: C:\Users\User\Desktop\Adminki\. Программа домен...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Размышление
+
+
+
+
+
+Понял: нужна точная команда. Сейчас проблема уже не в кодировке, а в том, что BUILD8.ps1 ищет несуществующий вариант кода.
+
+Скопируйте и выполните одной строкой эту команду — она покажет фактический блок Spaceship из исходника:
+
+$root='C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'; Get-ChildItem $root -Recurse -File -Include '*.cs','*.ps1' | Where-Object {$_.FullName -notmatch '\\\.build8-backup-'} | Select-String -Pattern 'Spaceship|BaseUrl|requestUrl|relativePath|HttpClient|SendAsync|GetAsync' -Context 3,5 | ForEach-Object {"`r`n===== $($_.Path), строка $($_.LineNumber) =====`r`n$($_.Context.PreContext -join "`r`n")`r`n$($_.Line)`r`n$($_.Context.PostContext -join "`r`n")"} | Set-Content "$env:TEMP\spaceship-code.txt" -Encoding UTF8; notepad.exe "$env:TEMP\spaceship-code.txt"
+
+Откроется Блокнот. Пришлите сюда весь его текст. После этого я дам точную исправляющую команду под реальный код. Пока BUILD8.ps1 повторно не запускайте.
+
+Смотри в https://github.com/raliya/kdhGHf643tf76.git файл называется 45747.txt
+GPT-5.6 Sol
+GPT-5.6 Sol
+Навык активирован: page_content
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+Посмотрел 45747.txt. Причина найдена: в регулярном выражении BUILD8.ps1 обратные слеши задвоены (\\. вместо \.), поэтому существующий блок не находится.
+
+Чтобы не рисковать новым исправлением самого скрипта, внесём пагинацию прямо в оба нужных файла. После этого BUILD8.ps1 увидит готовое исправление и продолжит сборку.
+
+Скопируйте и выполните целиком одной строкой:
+
+$root='C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'; $files=@((Join-Path $root 'MainWindow.Build7.cs'),(Join-Path $root 'BUILD7.ps1')); foreach($p in $files){$s=[IO.File]::ReadAllText($p); if($s.Contains('paginationSeparator + "take=100&skip=0"')){Write-Host "Уже исправлен: $p" -ForegroundColor Yellow; continue}; $pattern='(?m)^(?<i>[ \t]*)var baseUrl = settings\.BaseUrl\.TrimEnd%%MATH_INLINE_0%%;[ \t]*\r?\n[ \t]*var requestUrl = baseUrl \+ "/" \+ relativePath;[ \t]*$'; $rx=[regex]::new($pattern); $m=$rx.Matches($s); if($m.Count -ne 1){throw "В файле $p найдено блоков: $($m.Count)"}; $ev=[Text.RegularExpressions.MatchEvaluator]{param($x) $i=$x.Groups['i'].Value; $nl=if($x.Value.Contains("`r`n")){"`r`n"}else{"`n"}; return $i+"var baseUrl = settings.BaseUrl.TrimEnd('/');"+$nl+$i+'var requestUrl = baseUrl + "/" + relativePath;'+$nl+$nl+$i+'var paginationSeparator ='+$nl+$i+'    requestUrl.Contains(''?'') ? "&" : "?";'+$nl+$nl+$i+'requestUrl +='+$nl+$i+'    paginationSeparator + "take=100&skip=0";'}; $u=$rx.Replace($s,$ev,1); [IO.File]::WriteAllText($p,$u,(New-Object Text.UTF8Encoding($true))); Write-Host "Исправлен: $p" -ForegroundColor Green}; powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'BUILD8.ps1')
+
+Команда:
+
+добавит take=100&skip=0 в MainWindow.Build7.cs;
+добавит то же исправление в шаблон BUILD7.ps1;
+сразу повторно запустит BUILD8.ps1;
+не внесёт исправление второй раз, если оно уже присутствует.
+>>
+В файле C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs найдено блоков: 0
+строка:1 знак:560
++ ... m.Count -ne 1){throw "В файле $p найдено блоков: $($m.Count)"}; $ev=[ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++ CategoryInfo : OperationStopped: (В файле C:\User...йдено блоков: 0:String) , RuntimeException
++ FullyQualifiedErrorId : В файле C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWind...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+Нашёл ошибку: предыдущая команда искала \"/\", хотя в файле записано обычное "/". Используем поиск точной строки без регулярных выражений.
+
+Скопируйте и выполните одной строкой:
+
+$root='C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'; $stamp=Get-Date -Format 'yyyyMMdd-HHmmss'; $files=@((Join-Path $root 'MainWindow.Build7.cs'),(Join-Path $root 'BUILD7.ps1')); $enc=New-Object System.Text.UTF8Encoding($true); foreach($p in $files){if(!(Test-Path -LiteralPath $p)){throw "Файл не найден: $p"}; Copy-Item -LiteralPath $p -Destination ($p+'.before-pagination-'+$stamp) -Force; $lines=[Collections.Generic.List[string]]::new(); $lines.AddRange([IO.File]::ReadAllLines($p)); if(($lines -join "`n").Contains('paginationSeparator + "take=100&skip=0"')){Write-Host "Уже исправлен: $p" -ForegroundColor Yellow; continue}; $hits=@(); for($i=0;$i -lt $lines.Count;$i++){if($lines[$i].Trim() -eq 'var requestUrl = baseUrl + "/" + relativePath;'){$hits+=$i}}; if($hits.Count -ne 1){throw "В файле $p найдено точных строк requestUrl: $($hits.Count)"}; $n=$hits[0]; $indent=($lines[%%MATH_INLINE_10%%',''); [string[]]$add=@('',$indent+'// Spaceship API pagination.',$indent+'var paginationSeparator =',$indent+'    requestUrl.Contains(''?'') ? "&" : "?";','',$indent+'requestUrl +=',$indent+'    paginationSeparator + "take=100&skip=0";'); $lines.InsertRange($n+1,$add); [IO.File]::WriteAllLines($p,$lines,$enc); Write-Host "Исправлен: $p" -ForegroundColor Green}; powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'BUILD8.ps1')
+
+Команда создаст отдельные резервные копии обоих файлов, внесёт пагинацию и запустит BUILD8.ps1. Сообщение >> при вставке одной строки нормально — после вставки нажмите Enter.
+
+строка:1 знак:1059
++ ... paginationSeparator =',$indent+' requestUrl.Contains(''?'') ? "&" ...
++ ~~~
+Непредвиденная лексема "?''" в выражении или операторе.
+строка:1 знак:1059
++ ... ar paginationSeparator =',$indent+' requestUrl.Contains(''?'') ? " ...
++ ~
+Отсутствует закрывающий знак ")" в выражении.
+строка:1 знак:267
++ ... bject System.Text.UTF8Encoding($true); for...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+get_page_content
+Содержимое страницы
+Размышление
+
+
+
+
+
+Сейчас PowerShell ждёт продолжения незаконченной команды (>>). Сначала нажмите:
+
+Ctrl+C
+
+Должно снова появиться:
+
+PS C:\WINDOWS\system32>
+
+Затем вставьте целиком одной строкой:
+
+$root='C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'; $dq=[char]34; $sq=[char]39; $nl=[Environment]::NewLine; $old='var requestUrl = baseUrl + '+$dq+'/'+$dq+' + relativePath;'; $new=$old+$nl+'        // Spaceship API pagination.'+$nl+'        var paginationSeparator ='+$nl+'            requestUrl.Contains('+$sq+'?'+$sq+') ? '+$dq+'&'+$dq+' : '+$dq+'?'+$dq+';'+$nl+$nl+'        requestUrl +='+$nl+'            paginationSeparator + '+$dq+'take=100&skip=0'+$dq+';'; $files=@((Join-Path $root 'MainWindow.Build7.cs'),(Join-Path $root 'BUILD7.ps1')); foreach($p in $files){if(!(Test-Path -LiteralPath $p)){throw ('Файл не найден: '+$p)}; $s=[IO.File]::ReadAllText($p); if($s.Contains('take=100&skip=0')){Write-Host ('Уже исправлен: '+$p) -ForegroundColor Yellow; continue}; $count=([regex]::Matches($s,[regex]::Escape($old))).Count; if($count -ne 1){throw ('В файле '+$p+' найдено строк: '+$count)}; Copy-Item -LiteralPath $p -Destination ($p+'.backup-'+(Get-Date -Format 'yyyyMMdd-HHmmss')) -Force; $s=$s.Replace($old,$new); [IO.File]::WriteAllText($p,$s,(New-Object Text.UTF8Encoding($true))); Write-Host ('Исправлен: '+$p) -ForegroundColor Green}; & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'BUILD8.ps1')
+
+В этой версии нет конструкции $lines[$n], которую ваш способ копирования превратил в %%MATH_INLINE_10%%, и проблемной вложенности кавычек. После запуска BUILD8.ps1 должен пропустить уже исправленный блок Spaceship и перейти к следующему этапу.
+
+05.09.2026 16:23:25 ERROR casino71.cfd Серверная команда завершилась с кодом 2: /tmp/text-file-processor-db-3ed0e7378d3b4039a3972a7f861c96e0/run.sh: line 40: $'\r': command not found /tmp/text-file-processor-db-3ed0e7378d3b4039a3972a7f861c96e0/run.sh: line 74: syntax error near unexpected token `$'in\r'' /tmp/text-file-processor-db-3ed0e7378d3b4039a3972a7f861c96e0/run.sh: line 74: ` case "$CREATE_OUTPUT" in '
+
+нет загрузки БД!
+Исправь! СРОЧНО!
+Со...
+Развернуть
+Получил ответ от инструмента
+Размышление
+
+
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+Размышление
+
+
+
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
