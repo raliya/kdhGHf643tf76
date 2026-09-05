@@ -1,0 +1,571 @@
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\.build9-backup-20260905-222612
+PS C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка> Select-String -Path '.\BUILD9.ps1' `
+>>     -Pattern 'ISPmanager|успешное завершение ISPmanager|CompleteBuild7LegacyOperation' `
+>>     -Context 15,25 |
+>>     ForEach-Object {
+>>         "`n--- строка $($_.LineNumber) ---"
+>>         $_.Context.PreContext
+>>         $_.Line
+>>         $_.Context.PostContext
+>>     }
+>>
+
+--- строка 164 ---
+            if (failedCount > 0)
+            {
+                CaptureBuild7Error(
+                    new InvalidOperationException(
+                        "Локальная обработка завершилась с ошибками. " +
+                        $"Ошибок: {failedCount}."));
+            }
+            else if (cancelledCount > 0)
+            {
+                CaptureBuild7Error(
+                    new OperationCanceledException(
+                        "Локальная обработка отменена или пропущена."));
+            }
+            else
+            {
+                CompleteBuild7LegacyOperation();
+            }
+        }
+        catch (Exception exception)
+        {
+            CaptureBuild7Error(exception);
+
+            var message =
+                SensitiveDataRedactor.Redact(
+                    exception.Message);
+'@
+
+    $Text = Replace-Required `
+        -Text $Text `
+        -Old $Old `
+        -New $New `
+        -Name 'результат локальной обработки' `
+        -Marker 'Локальная обработка завершилась с ошибками.'
+
+    Write-Source $Files.Main $Text
+
+    # ---------------------------------------------------------
+    # MainWindow.Build2.cs
+    # ---------------------------------------------------------
+
+    Write-Host ''
+
+--- строка 190 ---
+
+    $Text = Replace-Required `
+        -Text $Text `
+        -Old $Old `
+        -New $New `
+        -Name 'результат локальной обработки' `
+        -Marker 'Локальная обработка завершилась с ошибками.'
+
+    Write-Source $Files.Main $Text
+
+    # ---------------------------------------------------------
+    # MainWindow.Build2.cs
+    # ---------------------------------------------------------
+
+    Write-Host ''
+    Write-Host '=== ISPmanager ===' `
+        -ForegroundColor Cyan
+
+    $Text = Read-Source $Files.Build2
+
+    $Old = @'
+            MessageBox.Show(
+                this,
+                result.Message,
+                "ISPmanager",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception exception)
+'@
+
+    $New = @'
+            MessageBox.Show(
+                this,
+                result.Message,
+                "ISPmanager",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            CompleteBuild7LegacyOperation();
+        }
+
+--- строка 199 ---
+
+    # ---------------------------------------------------------
+    # MainWindow.Build2.cs
+    # ---------------------------------------------------------
+
+    Write-Host ''
+    Write-Host '=== ISPmanager ===' `
+        -ForegroundColor Cyan
+
+    $Text = Read-Source $Files.Build2
+
+    $Old = @'
+            MessageBox.Show(
+                this,
+                result.Message,
+                "ISPmanager",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception exception)
+'@
+
+    $New = @'
+            MessageBox.Show(
+                this,
+                result.Message,
+                "ISPmanager",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            CompleteBuild7LegacyOperation();
+        }
+        catch (Exception exception)
+'@
+
+    $Text = Replace-Required `
+        -Text $Text `
+        -Old $Old `
+        -New $New `
+        -Name 'успешное завершение ISPmanager' `
+        -Marker @'
+
+--- строка 210 ---
+    $Old = @'
+            MessageBox.Show(
+                this,
+                result.Message,
+                "ISPmanager",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception exception)
+'@
+
+    $New = @'
+            MessageBox.Show(
+                this,
+                result.Message,
+                "ISPmanager",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            CompleteBuild7LegacyOperation();
+        }
+        catch (Exception exception)
+'@
+
+    $Text = Replace-Required `
+        -Text $Text `
+        -Old $Old `
+        -New $New `
+        -Name 'успешное завершение ISPmanager' `
+        -Marker @'
+            CompleteBuild7LegacyOperation();
+        }
+        catch (Exception exception)
+        {
+            ShowBuild2Error(exception);
+'@
+
+    $Old = @'
+    private void ShowBuild2Error(Exception exception)
+    {
+        var message =
+
+--- строка 214 ---
+                "ISPmanager",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception exception)
+'@
+
+    $New = @'
+            MessageBox.Show(
+                this,
+                result.Message,
+                "ISPmanager",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            CompleteBuild7LegacyOperation();
+        }
+        catch (Exception exception)
+'@
+
+    $Text = Replace-Required `
+        -Text $Text `
+        -Old $Old `
+        -New $New `
+        -Name 'успешное завершение ISPmanager' `
+        -Marker @'
+            CompleteBuild7LegacyOperation();
+        }
+        catch (Exception exception)
+        {
+            ShowBuild2Error(exception);
+'@
+
+    $Old = @'
+    private void ShowBuild2Error(Exception exception)
+    {
+        var message =
+'@
+
+    $New = @'
+    private void ShowBuild2Error(Exception exception)
+
+--- строка 223 ---
+                this,
+                result.Message,
+                "ISPmanager",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            CompleteBuild7LegacyOperation();
+        }
+        catch (Exception exception)
+'@
+
+    $Text = Replace-Required `
+        -Text $Text `
+        -Old $Old `
+        -New $New `
+        -Name 'успешное завершение ISPmanager' `
+        -Marker @'
+            CompleteBuild7LegacyOperation();
+        }
+        catch (Exception exception)
+        {
+            ShowBuild2Error(exception);
+'@
+
+    $Old = @'
+    private void ShowBuild2Error(Exception exception)
+    {
+        var message =
+'@
+
+    $New = @'
+    private void ShowBuild2Error(Exception exception)
+    {
+        CaptureBuild7Error(exception);
+
+        var message =
+'@
+
+    $Text = Replace-Required `
+        -Text $Text `
+        -Old $Old `
+
+--- строка 225 ---
+                "ISPmanager",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            CompleteBuild7LegacyOperation();
+        }
+        catch (Exception exception)
+'@
+
+    $Text = Replace-Required `
+        -Text $Text `
+        -Old $Old `
+        -New $New `
+        -Name 'успешное завершение ISPmanager' `
+        -Marker @'
+            CompleteBuild7LegacyOperation();
+        }
+        catch (Exception exception)
+        {
+            ShowBuild2Error(exception);
+'@
+
+    $Old = @'
+    private void ShowBuild2Error(Exception exception)
+    {
+        var message =
+'@
+
+    $New = @'
+    private void ShowBuild2Error(Exception exception)
+    {
+        CaptureBuild7Error(exception);
+
+        var message =
+'@
+
+    $Text = Replace-Required `
+        -Text $Text `
+        -Old $Old `
+        -New $New `
+        -Name 'передача ошибки ISPmanager' `
+
+--- строка 250 ---
+        var message =
+'@
+
+    $New = @'
+    private void ShowBuild2Error(Exception exception)
+    {
+        CaptureBuild7Error(exception);
+
+        var message =
+'@
+
+    $Text = Replace-Required `
+        -Text $Text `
+        -Old $Old `
+        -New $New `
+        -Name 'передача ошибки ISPmanager' `
+        -Marker @'
+    private void ShowBuild2Error(Exception exception)
+    {
+        CaptureBuild7Error(exception);
+'@
+
+    Write-Source $Files.Build2 $Text
+
+    # ---------------------------------------------------------
+    # MainWindow.Build3.cs
+    # ---------------------------------------------------------
+
+    Write-Host ''
+    Write-Host '=== SSH/SFTP ===' `
+        -ForegroundColor Cyan
+
+    $Text = Read-Source $Files.Build3
+
+    $Old = @'
+            Build3ProgressBar.Value = 100;
+            Build3StatusTextBlock.Text = message;
+            SetStatus(message);
+            AddLog(
+                "INFO",
+                selectedJob.Domain,
+
+--- строка 302 ---
+    $New = @'
+            Build3ProgressBar.Value = 100;
+            Build3StatusTextBlock.Text = message;
+            SetStatus(message);
+            AddLog(
+                "INFO",
+                selectedJob.Domain,
+                message);
+            MessageBox.Show(
+                this,
+                message,
+                "SSH/SFTP",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            CompleteBuild7LegacyOperation();
+        }
+        catch (Exception exception)
+'@
+
+    $Text = Replace-Required `
+        -Text $Text `
+        -Old $Old `
+        -New $New `
+        -Name 'успешное завершение загрузки файлов' `
+        -Marker @'
+            Build3ProgressBar.Value = 100;
+            Build3StatusTextBlock.Text = message;
+            SetStatus(message);
+            AddLog(
+                "INFO",
+                selectedJob.Domain,
+                message);
+            MessageBox.Show(
+                this,
+                message,
+                "SSH/SFTP",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            CompleteBuild7LegacyOperation();
+
+--- строка 327 ---
+        -Marker @'
+            Build3ProgressBar.Value = 100;
+            Build3StatusTextBlock.Text = message;
+            SetStatus(message);
+            AddLog(
+                "INFO",
+                selectedJob.Domain,
+                message);
+            MessageBox.Show(
+                this,
+                message,
+                "SSH/SFTP",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            CompleteBuild7LegacyOperation();
+'@
+
+    $Old = @'
+    private void ShowBuild3Error(Exception exception)
+    {
+        var message =
+'@
+
+    $New = @'
+    private void ShowBuild3Error(Exception exception)
+    {
+        CaptureBuild7Error(exception);
+
+        var message =
+'@
+
+    $Text = Replace-Required `
+        -Text $Text `
+        -Old $Old `
+        -New $New `
+        -Name 'передача ошибки SSH/SFTP' `
+        -Marker @'
+    private void ShowBuild3Error(Exception exception)
+    {
+        CaptureBuild7Error(exception);
+
+--- строка 388 ---
+                MessageBoxImage.Information);
+        }
+        catch (Exception exception)
+        {
+            var message =
+'@
+
+    $New = @'
+            MessageBox.Show(
+                this,
+                message,
+                "Сборка 4 — успешно",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            CompleteBuild7LegacyOperation();
+        }
+        catch (Exception exception)
+        {
+            CaptureBuild7Error(exception);
+
+            var message =
+'@
+
+    $Text = Replace-Required `
+        -Text $Text `
+        -Old $Old `
+        -New $New `
+        -Name 'результат развёртывания базы данных' `
+        -Marker @'
+                "Сборка 4 — успешно",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            CompleteBuild7LegacyOperation();
+'@
+
+    Write-Source $Files.Build4 $Text
+
+    # ---------------------------------------------------------
+    # MainWindow.Build7.cs
+
+--- строка 407 ---
+            CaptureBuild7Error(exception);
+
+            var message =
+'@
+
+    $Text = Replace-Required `
+        -Text $Text `
+        -Old $Old `
+        -New $New `
+        -Name 'результат развёртывания базы данных' `
+        -Marker @'
+                "Сборка 4 — успешно",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            CompleteBuild7LegacyOperation();
+'@
+
+    Write-Source $Files.Build4 $Text
+
+    # ---------------------------------------------------------
+    # MainWindow.Build7.cs
+    # ---------------------------------------------------------
+
+    Write-Host ''
+    Write-Host '=== Последовательный запуск ===' `
+        -ForegroundColor Cyan
+
+    $Text = Read-Source $Files.Build7
+
+    $Old = @'
+    private Button? _build7SpaceshipButton;
+    private Button? _build7AllButton;
+    private readonly HttpClient _spaceshipHttpClient =
+'@
+
+    $New = @'
+    private Button? _build7SpaceshipButton;
+    private Button? _build7AllButton;
+
+    private TaskCompletionSource<object?>?
+
+--- строка 626 ---
+                    $"{operationName}.",
+                    exception);
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(
+                    _build7LegacyCompletion,
+                    completion))
+            {
+                _build7LegacyCompletion = null;
+            }
+        }
+    }
+
+    private void CompleteBuild7LegacyOperation()
+    {
+        _build7LegacyCompletion?.TrySetResult(null);
+    }
+
+    private void CaptureBuild7Error(Exception exception)
+    {
+        var completion = _build7LegacyCompletion;
+        if (completion is null ||
+            completion.Task.IsCompleted)
+        {
+            return;
+        }
+
+        if (exception is OperationCanceledException)
+        {
+            completion.TrySetCanceled();
+            return;
+        }
+
+        completion.TrySetException(exception);
+    }
+'@
+
+    $Text = Replace-Required `
+        -Text $Text `
+PS C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка>
