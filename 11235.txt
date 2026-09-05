@@ -1,0 +1,1473 @@
+PS C:\WINDOWS\system32> $root = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+>>
+>> $files = @(
+>>     (Join-Path $root 'MainWindow.Build7.cs'),
+>>     (Join-Path $root 'BUILD7.ps1')
+>> )
+>>
+>> foreach ($file in $files) {
+>>     Write-Host "`n==================================================" -ForegroundColor Cyan
+>>     Write-Host "ФАЙЛ: $file" -ForegroundColor Cyan
+>>     Write-Host "==================================================" -ForegroundColor Cyan
+>>
+>>     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
+>>         Write-Host 'Файл не найден' -ForegroundColor Red
+>>         continue
+>>     }
+>>
+>>     $lines = Get-Content -LiteralPath $file -Encoding UTF8
+>>
+>>     $matches = Select-String `
+>>         -LiteralPath $file `
+>>         -Pattern 'Spaceship|baseUrl|requestUrl|relativePath|take=|skip=|dns/records|dns-records' `
+>>         -CaseSensitive:$false
+>>
+>>     if (-not $matches) {
+>>         Write-Host 'Подходящие строки не найдены.' -ForegroundColor Yellow
+>>         continue
+>>     }
+>>
+>>     $numbers = foreach ($match in $matches) {
+>>         $start = [Math]::Max(1, $match.LineNumber - 8)
+>>         $end = [Math]::Min($lines.Count, $match.LineNumber + 12)
+>>
+>>         $start..$end
+>>     }
+>>
+>>     $numbers = $numbers | Sort-Object -Unique
+>>
+>>     $previous = 0
+>>
+>>     foreach ($number in $numbers) {
+>>         if ($previous -ne 0 -and $number -gt ($previous + 1)) {
+>>             Write-Host '--------------------' -ForegroundColor DarkGray
+>>         }
+>>
+>>         '{0,5}: {1}' -f $number, $lines[$number - 1]
+>>         $previous = $number
+>>     }
+>> }
+>>
+
+==================================================
+ФАЙЛ: C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs
+==================================================
+    8: using System.Windows.Media;
+    9: using TextFileProcessor.Models;
+   10: using TextFileProcessor.Services;
+   11:
+   12: namespace TextFileProcessor;
+   13:
+   14: public partial class MainWindow
+   15: {
+   16:     private TextBox? _spaceshipBaseUrlTextBox;
+   17:     private TextBox? _spaceshipKeyTextBox;
+   18:     private PasswordBox? _spaceshipSecretPasswordBox;
+   19:     private TextBox? _spaceshipDomainTextBox;
+   20:     private TextBox? _spaceshipDnsPathTextBox;
+   21:     private TextBlock? _spaceshipSecretStatus;
+   22:     private TextBlock? _build7Status;
+   23:     private ProgressBar? _build7Progress;
+   24:
+   25:     private Button? _build7LocalButton;
+   26:     private Button? _build7DomainButton;
+   27:     private Button? _build7UploadButton;
+   28:     private Button? _build7DatabaseButton;
+   29:     private Button? _build7SpaceshipButton;
+   30:     private Button? _build7AllButton;
+   31:
+   32:     private readonly HttpClient _spaceshipHttpClient =
+   33:         new()
+   34:         {
+   35:             Timeout = TimeSpan.FromSeconds(45)
+   36:         };
+   37:
+   38:     private void InitializeBuild7()
+   39:     {
+   40:         Loaded += Build7_Loaded;
+   41:     }
+   42:
+   43:     private void Build7_Loaded(
+   44:         object sender,
+--------------------
+   54:                     "Не найден основной TabControl.");
+   55:             }
+   56:
+   57:             if (tabControl.Items
+   58:                 .OfType<TabItem>()
+   59:                 .Any(item =>
+   60:                     string.Equals(
+   61:                         item.Header?.ToString(),
+   62:                         "Процессы / Spaceship",
+   63:                         StringComparison.Ordinal)))
+   64:             {
+   65:                 return;
+   66:             }
+   67:
+   68:             tabControl.Items.Insert(
+   69:                 0,
+   70:                 CreateBuild7Tab());
+   71:
+   72:             LoadSpaceshipSettings();
+   73:
+   74:             AddLog(
+   75:                 "INFO",
+   76:                 string.Empty,
+   77:                 "Сборка 7 загружена: раздельные процессы, " +
+   78:                 "общий запуск и настройки Spaceship API.");
+   79:         }
+   80:         catch (Exception exception)
+   81:         {
+   82:             var message = SensitiveDataRedactor.Redact(
+   83:                 exception.Message);
+   84:
+   85:             SetStatus("Ошибка Сборки 7: " + message);
+   86:             AddLog("ERROR", string.Empty, message);
+   87:         }
+   88:     }
+   89:
+   90:     private TabItem CreateBuild7Tab()
+--------------------
+  178:                 EnsureSelectedJob();
+  179:                 DeployDatabaseButton_Click(
+  180:                     this,
+  181:                     new RoutedEventArgs());
+  182:
+  183:                 await WaitForLegacyOperationAsync();
+  184:             });
+  185:
+  186:         _build7SpaceshipButton = CreateProcessButton(
+  187:             "5. Проверить Spaceship",
+  188:             190,
+  189:             TestSpaceshipForSelectedJobAsync);
+  190:
+  191:         _build7AllButton = CreateProcessButton(
+  192:             "ЗАПУСТИТЬ ВСЕ ПРОЦЕССЫ",
+  193:             245,
+  194:             RunAllProcessesAsync);
+  195:
+  196:         _build7AllButton.Background =
+  197:             new SolidColorBrush(Color.FromRgb(31, 122, 63));
+  198:
+  199:         _build7AllButton.Foreground = Brushes.White;
+  200:         _build7AllButton.FontWeight = FontWeights.Bold;
+  201:
+  202:         processPanel.Children.Add(_build7LocalButton);
+  203:         processPanel.Children.Add(_build7DomainButton);
+  204:         processPanel.Children.Add(_build7UploadButton);
+  205:         processPanel.Children.Add(_build7DatabaseButton);
+  206:         processPanel.Children.Add(_build7SpaceshipButton);
+  207:         processPanel.Children.Add(_build7AllButton);
+  208:
+  209:         processBox.Content = processPanel;
+  210:
+  211:         Grid.SetRow(processBox, 0);
+  212:         root.Children.Add(processBox);
+  213:
+  214:         var apiBox = new GroupBox
+  215:         {
+  216:             Header = "Spaceship API",
+  217:             Margin = new Thickness(0, 0, 0, 12)
+  218:         };
+  219:
+  220:         var apiGrid = new Grid
+  221:         {
+  222:             Margin = new Thickness(10)
+  223:         };
+  224:
+  225:         apiGrid.ColumnDefinitions.Add(
+  226:             new ColumnDefinition
+  227:             {
+  228:                 Width = new GridLength(205)
+--------------------
+  238:         {
+  239:             apiGrid.RowDefinitions.Add(
+  240:                 new RowDefinition
+  241:                 {
+  242:                     Height = GridLength.Auto
+  243:                 });
+  244:         }
+  245:
+  246:         _spaceshipBaseUrlTextBox = AddTextSetting(
+  247:             apiGrid,
+  248:             0,
+  249:             "Base URL:",
+  250:             "https://spaceship.dev/api/v1");
+  251:
+  252:         _spaceshipKeyTextBox = AddTextSetting(
+  253:             apiGrid,
+  254:             1,
+  255:             "API Key:",
+  256:             string.Empty);
+  257:
+  258:         _spaceshipSecretPasswordBox =
+  259:             new PasswordBox
+  260:             {
+  261:                 Margin = new Thickness(0, 0, 0, 8)
+  262:             };
+  263:
+  264:         AddLabel(
+  265:             apiGrid,
+  266:             2,
+  267:             "API Secret:");
+  268:
+  269:         Grid.SetRow(_spaceshipSecretPasswordBox, 2);
+  270:         Grid.SetColumn(_spaceshipSecretPasswordBox, 1);
+  271:         apiGrid.Children.Add(_spaceshipSecretPasswordBox);
+  272:
+  273:         _spaceshipSecretStatus = new TextBlock
+  274:         {
+  275:             Margin = new Thickness(0, 0, 0, 8),
+  276:             Foreground = Brushes.DimGray,
+  277:             Text = "API Secret ещё не сохранён."
+  278:         };
+  279:
+  280:         Grid.SetRow(_spaceshipSecretStatus, 3);
+  281:         Grid.SetColumn(_spaceshipSecretStatus, 1);
+  282:         apiGrid.Children.Add(_spaceshipSecretStatus);
+  283:
+  284:         _spaceshipDomainTextBox = AddTextSetting(
+  285:             apiGrid,
+  286:             4,
+  287:             "Домен для проверки:",
+  288:             string.Empty);
+  289:
+  290:         _spaceshipDnsPathTextBox = AddTextSetting(
+  291:             apiGrid,
+  292:             5,
+  293:             "DNS path:",
+  294:             "dns/records/{domain}");
+  295:
+  296:         var apiButtons = new WrapPanel
+  297:         {
+  298:             Margin = new Thickness(0, 5, 0, 0)
+  299:         };
+  300:
+  301:         var saveButton = new Button
+  302:         {
+  303:             Content = "Сохранить Spaceship",
+  304:             Width = 190,
+  305:             Padding = new Thickness(10, 6, 10, 6),
+  306:             Margin = new Thickness(0, 0, 8, 8)
+  307:         };
+  308:
+  309:         saveButton.Click += (_, _) =>
+  310:         {
+  311:             try
+  312:             {
+  313:                 SaveSpaceshipSettings();
+  314:
+  315:                 SetBuild7Status(
+  316:                     0,
+  317:                     "Настройки Spaceship сохранены. " +
+  318:                     "API Secret защищён Windows DPAPI.");
+  319:
+  320:                 AddLog(
+  321:                     "INFO",
+  322:                     string.Empty,
+  323:                     "Настройки Spaceship сохранены. " +
+  324:                     "API Secret в журнал не записан.");
+  325:             }
+  326:             catch (Exception exception)
+  327:             {
+  328:                 ShowBuild7Error(
+  329:                     string.Empty,
+  330:                     exception);
+  331:             }
+  332:         };
+  333:
+  334:         var testButton = new Button
+  335:         {
+  336:             Content = "Проверить Spaceship API",
+  337:             Width = 205,
+  338:             Padding = new Thickness(10, 6, 10, 6),
+  339:             Margin = new Thickness(0, 0, 8, 8)
+  340:         };
+  341:
+  342:         testButton.Click += async (_, _) =>
+  343:             await ExecuteBuild7OperationAsync(
+  344:                 TestSpaceshipForSelectedJobAsync);
+  345:
+  346:         apiButtons.Children.Add(saveButton);
+  347:         apiButtons.Children.Add(testButton);
+  348:
+  349:         Grid.SetRow(apiButtons, 6);
+  350:         Grid.SetColumnSpan(apiButtons, 2);
+  351:         apiGrid.Children.Add(apiButtons);
+  352:
+  353:         apiBox.Content = apiGrid;
+  354:
+  355:         Grid.SetRow(apiBox, 1);
+  356:         root.Children.Add(apiBox);
+--------------------
+  386:
+  387:         statusBorder.Child = _build7Status;
+  388:
+  389:         Grid.SetRow(statusBorder, 3);
+  390:         root.Children.Add(statusBorder);
+  391:
+  392:         return new TabItem
+  393:         {
+  394:             Header = "Процессы / Spaceship",
+  395:             Content = new ScrollViewer
+  396:             {
+  397:                 VerticalScrollBarVisibility =
+  398:                     ScrollBarVisibility.Auto,
+  399:                 Content = root
+  400:             }
+  401:         };
+  402:     }
+  403:
+  404:     private Button CreateProcessButton(
+  405:         string caption,
+  406:         double width,
+--------------------
+  468:     {
+  469:         var confirmation = MessageBox.Show(
+  470:             this,
+  471:             "Запустить последовательный процесс?\n\n" +
+  472:             "1. Локальная обработка, если задания ещё не созданы.\n" +
+  473:             "2. Создание WWW-домена.\n" +
+  474:             "3. Загрузка файлов.\n" +
+  475:             "4. Создание БД и импорт SQL.\n" +
+  476:             "5. Проверка доступа к DNS через Spaceship API.\n\n" +
+  477:             "Текущие обработчики могут запросить дополнительное " +
+  478:             "подтверждение опасных операций.",
+  479:             "Полный процесс",
+  480:             MessageBoxButton.YesNo,
+  481:             MessageBoxImage.Question);
+  482:
+  483:         if (confirmation != MessageBoxResult.Yes)
+  484:         {
+  485:             return;
+  486:         }
+  487:
+  488:         if (!_jobs.Any(job =>
+--------------------
+  560:
+  561:             await WaitForLegacyOperationAsync();
+  562:             completedStages++;
+  563:
+  564:             SetBuild7Status(
+  565:                 CalculateAllPercent(
+  566:                     completedStages,
+  567:                     totalStages),
+  568:                 $"{job.Domain}: проверка Spaceship DNS API.");
+  569:
+  570:             if (_spaceshipDomainTextBox is not null)
+  571:             {
+  572:                 _spaceshipDomainTextBox.Text = job.Domain;
+  573:             }
+  574:
+  575:             await TestSpaceshipAsync(job.Domain);
+  576:             completedStages++;
+  577:         }
+  578:
+  579:         SetBuild7Status(
+  580:             100,
+  581:             $"Полный процесс завершён. Обработано доменов: " +
+  582:             jobs.Count + ".");
+  583:
+  584:         AddLog(
+  585:             "INFO",
+  586:             string.Empty,
+  587:             $"Полный процесс завершён. Доменов: {jobs.Count}.");
+--------------------
+  618:         }
+  619:
+  620:         return Math.Clamp(
+  621:             completed * 100 / total,
+  622:             0,
+  623:             99);
+  624:     }
+  625:
+  626:     private async Task TestSpaceshipForSelectedJobAsync()
+  627:     {
+  628:         var domain =
+  629:             _spaceshipDomainTextBox?.Text.Trim();
+  630:
+  631:         if (string.IsNullOrWhiteSpace(domain))
+  632:         {
+  633:             domain = GetSelectedJob()?.Domain;
+  634:         }
+  635:
+  636:         if (string.IsNullOrWhiteSpace(domain))
+  637:         {
+  638:             throw new InvalidOperationException(
+  639:                 "Укажите домен Spaceship или выберите задание.");
+  640:         }
+  641:
+  642:         await TestSpaceshipAsync(domain);
+  643:     }
+  644:
+  645:     private async Task TestSpaceshipAsync(string domain)
+  646:     {
+  647:         var settings = ReadSpaceshipSettings();
+  648:
+  649:         if (string.IsNullOrWhiteSpace(settings.ApiSecret))
+  650:         {
+  651:             throw new InvalidOperationException(
+  652:                 "Введите или сохраните Spaceship API Secret.");
+  653:         }
+  654:
+  655:         SaveSpaceshipSettings();
+  656:
+  657:         var relativePath = settings.DnsPath
+  658:             .Replace(
+  659:                 "{domain}",
+  660:                 Uri.EscapeDataString(domain),
+  661:                 StringComparison.OrdinalIgnoreCase)
+  662:             .TrimStart('/');
+  663:
+  664:         var baseUrl = settings.BaseUrl.TrimEnd('/');
+  665:         var requestUrl = baseUrl + "/" + relativePath;
+  666:
+  667:         SetBuild7Status(
+  668:             _build7Progress?.Value ?? 0,
+  669:             $"Spaceship API: чтение DNS-зоны {domain}.");
+  670:
+  671:         using var request = new HttpRequestMessage(
+  672:             HttpMethod.Get,
+  673:             requestUrl);
+  674:
+  675:         request.Headers.TryAddWithoutValidation(
+  676:             "X-API-Key",
+  677:             settings.ApiKey);
+  678:
+  679:         request.Headers.TryAddWithoutValidation(
+  680:             "X-API-Secret",
+  681:             settings.ApiSecret);
+  682:
+  683:         using var response =
+  684:             await _spaceshipHttpClient.SendAsync(
+  685:                 request,
+  686:                 HttpCompletionOption.ResponseHeadersRead);
+  687:
+  688:         var body = await response.Content.ReadAsStringAsync();
+  689:
+  690:         if (!response.IsSuccessStatusCode)
+  691:         {
+  692:             var safeBody = LimitAndRedact(
+  693:                 body,
+  694:                 settings.ApiKey,
+  695:                 settings.ApiSecret);
+  696:
+  697:             throw new InvalidOperationException(
+  698:                 $"Spaceship API вернул HTTP " +
+  699:                 $"{(int)response.StatusCode} " +
+  700:                 $"{response.ReasonPhrase}. {safeBody}");
+  701:         }
+  702:
+  703:         var resultDescription = DescribeJson(body);
+  704:
+  705:         SetBuild7Status(
+  706:             Math.Max(
+  707:                 1,
+  708:                 (int)(_build7Progress?.Value ?? 0)),
+  709:             $"Spaceship API доступен. Домен: {domain}. " +
+  710:             resultDescription);
+  711:
+  712:         AddLog(
+  713:             "INFO",
+  714:             domain,
+  715:             "Spaceship API: DNS-зона успешно прочитана.");
+  716:     }
+  717:
+  718:     private SpaceshipRuntimeSettings ReadSpaceshipSettings()
+  719:     {
+  720:         if (_spaceshipBaseUrlTextBox is null ||
+  721:             _spaceshipKeyTextBox is null ||
+  722:             _spaceshipSecretPasswordBox is null ||
+  723:             _spaceshipDnsPathTextBox is null)
+  724:         {
+  725:             throw new InvalidOperationException(
+  726:                 "Интерфейс Spaceship не инициализирован.");
+  727:         }
+  728:
+  729:         var stored = LoadSpaceshipSettingsFile();
+  730:
+  731:         var secret =
+  732:             _spaceshipSecretPasswordBox.Password;
+  733:
+  734:         if (string.IsNullOrEmpty(secret) &&
+  735:             !string.IsNullOrWhiteSpace(stored.EncryptedSecret))
+  736:         {
+  737:             secret = UnprotectSecret(
+  738:                 stored.EncryptedSecret);
+  739:         }
+  740:
+  741:         var settings = new SpaceshipRuntimeSettings
+  742:         {
+  743:             BaseUrl = _spaceshipBaseUrlTextBox.Text.Trim(),
+  744:             ApiKey = _spaceshipKeyTextBox.Text.Trim(),
+  745:             ApiSecret = secret,
+  746:             DnsPath = _spaceshipDnsPathTextBox.Text.Trim()
+  747:         };
+  748:
+  749:         if (!Uri.TryCreate(
+  750:                 settings.BaseUrl,
+  751:                 UriKind.Absolute,
+  752:                 out var uri) ||
+  753:             uri.Scheme != Uri.UriSchemeHttps)
+  754:         {
+  755:             throw new InvalidOperationException(
+  756:                 "Spaceship Base URL должен быть абсолютным HTTPS URL.");
+  757:         }
+  758:
+  759:         if (string.IsNullOrWhiteSpace(settings.ApiKey))
+  760:         {
+  761:             throw new InvalidOperationException(
+  762:                 "Не указан Spaceship API Key.");
+  763:         }
+  764:
+  765:         if (string.IsNullOrWhiteSpace(settings.DnsPath) ||
+  766:             !settings.DnsPath.Contains(
+  767:                 "{domain}",
+  768:                 StringComparison.OrdinalIgnoreCase))
+  769:         {
+  770:             throw new InvalidOperationException(
+  771:                 "DNS path должен содержать {domain}.");
+  772:         }
+  773:
+  774:         return settings;
+  775:     }
+  776:
+  777:     private void SaveSpaceshipSettings()
+  778:     {
+  779:         var settings = ReadSpaceshipSettings();
+  780:
+  781:         var stored = new SpaceshipStoredSettings
+  782:         {
+  783:             BaseUrl = settings.BaseUrl,
+  784:             ApiKey = settings.ApiKey,
+  785:             DnsPath = settings.DnsPath,
+  786:             EncryptedSecret = ProtectSecret(
+  787:                 settings.ApiSecret)
+  788:         };
+  789:
+  790:         var directory = Path.GetDirectoryName(
+  791:             SpaceshipSettingsPath);
+  792:
+  793:         if (string.IsNullOrWhiteSpace(directory))
+  794:         {
+  795:             throw new InvalidOperationException(
+  796:                 "Не удалось определить папку настроек.");
+  797:         }
+  798:
+  799:         Directory.CreateDirectory(directory);
+  800:
+  801:         var temporaryPath =
+  802:             SpaceshipSettingsPath + ".tmp";
+  803:
+  804:         var json = JsonSerializer.Serialize(
+  805:             stored,
+  806:             new JsonSerializerOptions
+  807:             {
+  808:                 WriteIndented = true
+  809:             });
+  810:
+  811:         File.WriteAllText(
+  812:             temporaryPath,
+  813:             json,
+  814:             new UTF8Encoding(false));
+  815:
+  816:         File.Move(
+  817:             temporaryPath,
+  818:             SpaceshipSettingsPath,
+  819:             true);
+  820:
+  821:         _spaceshipSecretPasswordBox?.Clear();
+  822:
+  823:         if (_spaceshipSecretStatus is not null)
+  824:         {
+  825:             _spaceshipSecretStatus.Text =
+  826:                 "API Secret сохранён и защищён Windows DPAPI.";
+  827:         }
+  828:     }
+  829:
+  830:     private void LoadSpaceshipSettings()
+  831:     {
+  832:         var stored = LoadSpaceshipSettingsFile();
+  833:
+  834:         if (_spaceshipBaseUrlTextBox is not null)
+  835:         {
+  836:             _spaceshipBaseUrlTextBox.Text =
+  837:                 string.IsNullOrWhiteSpace(stored.BaseUrl)
+  838:                     ? "https://spaceship.dev/api/v1"
+  839:                     : stored.BaseUrl;
+  840:         }
+  841:
+  842:         if (_spaceshipKeyTextBox is not null)
+  843:         {
+  844:             _spaceshipKeyTextBox.Text = stored.ApiKey;
+  845:         }
+  846:
+  847:         if (_spaceshipDnsPathTextBox is not null)
+  848:         {
+  849:             _spaceshipDnsPathTextBox.Text =
+  850:                 string.IsNullOrWhiteSpace(stored.DnsPath)
+  851:                     ? "dns/records/{domain}"
+  852:                     : stored.DnsPath;
+  853:         }
+  854:
+  855:         if (_spaceshipSecretStatus is not null)
+  856:         {
+  857:             _spaceshipSecretStatus.Text =
+  858:                 string.IsNullOrWhiteSpace(stored.EncryptedSecret)
+  859:                     ? "API Secret ещё не сохранён."
+  860:                     : "Зашифрованный API Secret сохранён.";
+  861:         }
+  862:     }
+  863:
+  864:     private SpaceshipStoredSettings LoadSpaceshipSettingsFile()
+  865:     {
+  866:         if (!File.Exists(SpaceshipSettingsPath))
+  867:         {
+  868:             return new SpaceshipStoredSettings();
+  869:         }
+  870:
+  871:         try
+  872:         {
+  873:             var json = File.ReadAllText(
+  874:                 SpaceshipSettingsPath,
+  875:                 Encoding.UTF8);
+  876:
+  877:             return JsonSerializer.Deserialize<
+  878:                        SpaceshipStoredSettings>(json) ??
+  879:                    new SpaceshipStoredSettings();
+  880:         }
+  881:         catch
+  882:         {
+  883:             return new SpaceshipStoredSettings();
+  884:         }
+  885:     }
+  886:
+  887:     private static string ProtectSecret(string value)
+  888:     {
+  889:         if (string.IsNullOrEmpty(value))
+  890:         {
+  891:             return string.Empty;
+  892:         }
+  893:
+  894:         var plainBytes = Encoding.UTF8.GetBytes(value);
+  895:
+  896:         try
+  897:         {
+  898:             var encrypted = ProtectedData.Protect(
+  899:                 plainBytes,
+  900:                 SpaceshipEntropy,
+  901:                 DataProtectionScope.CurrentUser);
+  902:
+  903:             return Convert.ToBase64String(encrypted);
+  904:         }
+  905:         finally
+  906:         {
+  907:             CryptographicOperations.ZeroMemory(plainBytes);
+  908:         }
+  909:     }
+  910:
+  911:     private static string UnprotectSecret(string value)
+  912:     {
+  913:         var encrypted = Convert.FromBase64String(value);
+  914:         var plainBytes = ProtectedData.Unprotect(
+  915:             encrypted,
+  916:             SpaceshipEntropy,
+  917:             DataProtectionScope.CurrentUser);
+  918:
+  919:         try
+  920:         {
+  921:             return Encoding.UTF8.GetString(plainBytes);
+  922:         }
+  923:         finally
+  924:         {
+  925:             CryptographicOperations.ZeroMemory(plainBytes);
+  926:         }
+  927:     }
+  928:
+--------------------
+ 1024:             _build7DomainButton.IsEnabled = enabled;
+ 1025:
+ 1026:         if (_build7UploadButton is not null)
+ 1027:             _build7UploadButton.IsEnabled = enabled;
+ 1028:
+ 1029:         if (_build7DatabaseButton is not null)
+ 1030:             _build7DatabaseButton.IsEnabled = enabled;
+ 1031:
+ 1032:         if (_build7SpaceshipButton is not null)
+ 1033:             _build7SpaceshipButton.IsEnabled = enabled;
+ 1034:
+ 1035:         if (_build7AllButton is not null)
+ 1036:             _build7AllButton.IsEnabled = enabled;
+ 1037:     }
+ 1038:
+ 1039:     private void ShowBuild7Error(
+ 1040:         string domain,
+ 1041:         Exception exception)
+ 1042:     {
+ 1043:         var message = SensitiveDataRedactor.Redact(
+ 1044:             exception.Message);
+ 1045:
+--------------------
+ 1121:             {
+ 1122:                 return nested;
+ 1123:             }
+ 1124:         }
+ 1125:
+ 1126:         return null;
+ 1127:     }
+ 1128:
+ 1129:     private static string SpaceshipSettingsPath =>
+ 1130:         Path.Combine(
+ 1131:             Environment.GetFolderPath(
+ 1132:                 Environment.SpecialFolder.LocalApplicationData),
+ 1133:             "TextFileProcessor",
+ 1134:             "spaceship-settings.json");
+ 1135:
+ 1136:     private static readonly byte[] SpaceshipEntropy =
+ 1137:         Encoding.UTF8.GetBytes(
+ 1138:             "TextFileProcessor.Spaceship.Build7.v1");
+ 1139:
+ 1140:     private sealed class SpaceshipRuntimeSettings
+ 1141:     {
+ 1142:         public string BaseUrl { get; init; } =
+ 1143:             "https://spaceship.dev/api/v1";
+ 1144:
+ 1145:         public string ApiKey { get; init; } = string.Empty;
+ 1146:
+ 1147:         public string ApiSecret { get; init; } = string.Empty;
+ 1148:
+ 1149:         public string DnsPath { get; init; } =
+ 1150:             "dns/records/{domain}";
+ 1151:     }
+ 1152:
+ 1153:     private sealed class SpaceshipStoredSettings
+ 1154:     {
+ 1155:         public string BaseUrl { get; set; } =
+ 1156:             "https://spaceship.dev/api/v1";
+ 1157:
+ 1158:         public string ApiKey { get; set; } = string.Empty;
+ 1159:
+ 1160:         public string EncryptedSecret { get; set; } =
+ 1161:             string.Empty;
+ 1162:
+ 1163:         public string DnsPath { get; set; } =
+ 1164:             "dns/records/{domain}";
+ 1165:     }
+ 1166: }
+
+==================================================
+ФАЙЛ: C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1
+==================================================
+  170: using System.Windows.Media;
+  171: using TextFileProcessor.Models;
+  172: using TextFileProcessor.Services;
+  173:
+  174: namespace TextFileProcessor;
+  175:
+  176: public partial class MainWindow
+  177: {
+  178:     private TextBox? _spaceshipBaseUrlTextBox;
+  179:     private TextBox? _spaceshipKeyTextBox;
+  180:     private PasswordBox? _spaceshipSecretPasswordBox;
+  181:     private TextBox? _spaceshipDomainTextBox;
+  182:     private TextBox? _spaceshipDnsPathTextBox;
+  183:     private TextBlock? _spaceshipSecretStatus;
+  184:     private TextBlock? _build7Status;
+  185:     private ProgressBar? _build7Progress;
+  186:
+  187:     private Button? _build7LocalButton;
+  188:     private Button? _build7DomainButton;
+  189:     private Button? _build7UploadButton;
+  190:     private Button? _build7DatabaseButton;
+  191:     private Button? _build7SpaceshipButton;
+  192:     private Button? _build7AllButton;
+  193:
+  194:     private readonly HttpClient _spaceshipHttpClient =
+  195:         new()
+  196:         {
+  197:             Timeout = TimeSpan.FromSeconds(45)
+  198:         };
+  199:
+  200:     private void InitializeBuild7()
+  201:     {
+  202:         Loaded += Build7_Loaded;
+  203:     }
+  204:
+  205:     private void Build7_Loaded(
+  206:         object sender,
+--------------------
+  216:                     "Не найден основной TabControl.");
+  217:             }
+  218:
+  219:             if (tabControl.Items
+  220:                 .OfType<TabItem>()
+  221:                 .Any(item =>
+  222:                     string.Equals(
+  223:                         item.Header?.ToString(),
+  224:                         "Процессы / Spaceship",
+  225:                         StringComparison.Ordinal)))
+  226:             {
+  227:                 return;
+  228:             }
+  229:
+  230:             tabControl.Items.Insert(
+  231:                 0,
+  232:                 CreateBuild7Tab());
+  233:
+  234:             LoadSpaceshipSettings();
+  235:
+  236:             AddLog(
+  237:                 "INFO",
+  238:                 string.Empty,
+  239:                 "Сборка 7 загружена: раздельные процессы, " +
+  240:                 "общий запуск и настройки Spaceship API.");
+  241:         }
+  242:         catch (Exception exception)
+  243:         {
+  244:             var message = SensitiveDataRedactor.Redact(
+  245:                 exception.Message);
+  246:
+  247:             SetStatus("Ошибка Сборки 7: " + message);
+  248:             AddLog("ERROR", string.Empty, message);
+  249:         }
+  250:     }
+  251:
+  252:     private TabItem CreateBuild7Tab()
+--------------------
+  340:                 EnsureSelectedJob();
+  341:                 DeployDatabaseButton_Click(
+  342:                     this,
+  343:                     new RoutedEventArgs());
+  344:
+  345:                 await WaitForLegacyOperationAsync();
+  346:             });
+  347:
+  348:         _build7SpaceshipButton = CreateProcessButton(
+  349:             "5. Проверить Spaceship",
+  350:             190,
+  351:             TestSpaceshipForSelectedJobAsync);
+  352:
+  353:         _build7AllButton = CreateProcessButton(
+  354:             "ЗАПУСТИТЬ ВСЕ ПРОЦЕССЫ",
+  355:             245,
+  356:             RunAllProcessesAsync);
+  357:
+  358:         _build7AllButton.Background =
+  359:             new SolidColorBrush(Color.FromRgb(31, 122, 63));
+  360:
+  361:         _build7AllButton.Foreground = Brushes.White;
+  362:         _build7AllButton.FontWeight = FontWeights.Bold;
+  363:
+  364:         processPanel.Children.Add(_build7LocalButton);
+  365:         processPanel.Children.Add(_build7DomainButton);
+  366:         processPanel.Children.Add(_build7UploadButton);
+  367:         processPanel.Children.Add(_build7DatabaseButton);
+  368:         processPanel.Children.Add(_build7SpaceshipButton);
+  369:         processPanel.Children.Add(_build7AllButton);
+  370:
+  371:         processBox.Content = processPanel;
+  372:
+  373:         Grid.SetRow(processBox, 0);
+  374:         root.Children.Add(processBox);
+  375:
+  376:         var apiBox = new GroupBox
+  377:         {
+  378:             Header = "Spaceship API",
+  379:             Margin = new Thickness(0, 0, 0, 12)
+  380:         };
+  381:
+  382:         var apiGrid = new Grid
+  383:         {
+  384:             Margin = new Thickness(10)
+  385:         };
+  386:
+  387:         apiGrid.ColumnDefinitions.Add(
+  388:             new ColumnDefinition
+  389:             {
+  390:                 Width = new GridLength(205)
+--------------------
+  400:         {
+  401:             apiGrid.RowDefinitions.Add(
+  402:                 new RowDefinition
+  403:                 {
+  404:                     Height = GridLength.Auto
+  405:                 });
+  406:         }
+  407:
+  408:         _spaceshipBaseUrlTextBox = AddTextSetting(
+  409:             apiGrid,
+  410:             0,
+  411:             "Base URL:",
+  412:             "https://spaceship.dev/api/v1");
+  413:
+  414:         _spaceshipKeyTextBox = AddTextSetting(
+  415:             apiGrid,
+  416:             1,
+  417:             "API Key:",
+  418:             string.Empty);
+  419:
+  420:         _spaceshipSecretPasswordBox =
+  421:             new PasswordBox
+  422:             {
+  423:                 Margin = new Thickness(0, 0, 0, 8)
+  424:             };
+  425:
+  426:         AddLabel(
+  427:             apiGrid,
+  428:             2,
+  429:             "API Secret:");
+  430:
+  431:         Grid.SetRow(_spaceshipSecretPasswordBox, 2);
+  432:         Grid.SetColumn(_spaceshipSecretPasswordBox, 1);
+  433:         apiGrid.Children.Add(_spaceshipSecretPasswordBox);
+  434:
+  435:         _spaceshipSecretStatus = new TextBlock
+  436:         {
+  437:             Margin = new Thickness(0, 0, 0, 8),
+  438:             Foreground = Brushes.DimGray,
+  439:             Text = "API Secret ещё не сохранён."
+  440:         };
+  441:
+  442:         Grid.SetRow(_spaceshipSecretStatus, 3);
+  443:         Grid.SetColumn(_spaceshipSecretStatus, 1);
+  444:         apiGrid.Children.Add(_spaceshipSecretStatus);
+  445:
+  446:         _spaceshipDomainTextBox = AddTextSetting(
+  447:             apiGrid,
+  448:             4,
+  449:             "Домен для проверки:",
+  450:             string.Empty);
+  451:
+  452:         _spaceshipDnsPathTextBox = AddTextSetting(
+  453:             apiGrid,
+  454:             5,
+  455:             "DNS path:",
+  456:             "dns/records/{domain}");
+  457:
+  458:         var apiButtons = new WrapPanel
+  459:         {
+  460:             Margin = new Thickness(0, 5, 0, 0)
+  461:         };
+  462:
+  463:         var saveButton = new Button
+  464:         {
+  465:             Content = "Сохранить Spaceship",
+  466:             Width = 190,
+  467:             Padding = new Thickness(10, 6, 10, 6),
+  468:             Margin = new Thickness(0, 0, 8, 8)
+  469:         };
+  470:
+  471:         saveButton.Click += (_, _) =>
+  472:         {
+  473:             try
+  474:             {
+  475:                 SaveSpaceshipSettings();
+  476:
+  477:                 SetBuild7Status(
+  478:                     0,
+  479:                     "Настройки Spaceship сохранены. " +
+  480:                     "API Secret защищён Windows DPAPI.");
+  481:
+  482:                 AddLog(
+  483:                     "INFO",
+  484:                     string.Empty,
+  485:                     "Настройки Spaceship сохранены. " +
+  486:                     "API Secret в журнал не записан.");
+  487:             }
+  488:             catch (Exception exception)
+  489:             {
+  490:                 ShowBuild7Error(
+  491:                     string.Empty,
+  492:                     exception);
+  493:             }
+  494:         };
+  495:
+  496:         var testButton = new Button
+  497:         {
+  498:             Content = "Проверить Spaceship API",
+  499:             Width = 205,
+  500:             Padding = new Thickness(10, 6, 10, 6),
+  501:             Margin = new Thickness(0, 0, 8, 8)
+  502:         };
+  503:
+  504:         testButton.Click += async (_, _) =>
+  505:             await ExecuteBuild7OperationAsync(
+  506:                 TestSpaceshipForSelectedJobAsync);
+  507:
+  508:         apiButtons.Children.Add(saveButton);
+  509:         apiButtons.Children.Add(testButton);
+  510:
+  511:         Grid.SetRow(apiButtons, 6);
+  512:         Grid.SetColumnSpan(apiButtons, 2);
+  513:         apiGrid.Children.Add(apiButtons);
+  514:
+  515:         apiBox.Content = apiGrid;
+  516:
+  517:         Grid.SetRow(apiBox, 1);
+  518:         root.Children.Add(apiBox);
+--------------------
+  548:
+  549:         statusBorder.Child = _build7Status;
+  550:
+  551:         Grid.SetRow(statusBorder, 3);
+  552:         root.Children.Add(statusBorder);
+  553:
+  554:         return new TabItem
+  555:         {
+  556:             Header = "Процессы / Spaceship",
+  557:             Content = new ScrollViewer
+  558:             {
+  559:                 VerticalScrollBarVisibility =
+  560:                     ScrollBarVisibility.Auto,
+  561:                 Content = root
+  562:             }
+  563:         };
+  564:     }
+  565:
+  566:     private Button CreateProcessButton(
+  567:         string caption,
+  568:         double width,
+--------------------
+  630:     {
+  631:         var confirmation = MessageBox.Show(
+  632:             this,
+  633:             "Запустить последовательный процесс?\n\n" +
+  634:             "1. Локальная обработка, если задания ещё не созданы.\n" +
+  635:             "2. Создание WWW-домена.\n" +
+  636:             "3. Загрузка файлов.\n" +
+  637:             "4. Создание БД и импорт SQL.\n" +
+  638:             "5. Проверка доступа к DNS через Spaceship API.\n\n" +
+  639:             "Текущие обработчики могут запросить дополнительное " +
+  640:             "подтверждение опасных операций.",
+  641:             "Полный процесс",
+  642:             MessageBoxButton.YesNo,
+  643:             MessageBoxImage.Question);
+  644:
+  645:         if (confirmation != MessageBoxResult.Yes)
+  646:         {
+  647:             return;
+  648:         }
+  649:
+  650:         if (!_jobs.Any(job =>
+--------------------
+  722:
+  723:             await WaitForLegacyOperationAsync();
+  724:             completedStages++;
+  725:
+  726:             SetBuild7Status(
+  727:                 CalculateAllPercent(
+  728:                     completedStages,
+  729:                     totalStages),
+  730:                 $"{job.Domain}: проверка Spaceship DNS API.");
+  731:
+  732:             if (_spaceshipDomainTextBox is not null)
+  733:             {
+  734:                 _spaceshipDomainTextBox.Text = job.Domain;
+  735:             }
+  736:
+  737:             await TestSpaceshipAsync(job.Domain);
+  738:             completedStages++;
+  739:         }
+  740:
+  741:         SetBuild7Status(
+  742:             100,
+  743:             $"Полный процесс завершён. Обработано доменов: " +
+  744:             jobs.Count + ".");
+  745:
+  746:         AddLog(
+  747:             "INFO",
+  748:             string.Empty,
+  749:             $"Полный процесс завершён. Доменов: {jobs.Count}.");
+--------------------
+  780:         }
+  781:
+  782:         return Math.Clamp(
+  783:             completed * 100 / total,
+  784:             0,
+  785:             99);
+  786:     }
+  787:
+  788:     private async Task TestSpaceshipForSelectedJobAsync()
+  789:     {
+  790:         var domain =
+  791:             _spaceshipDomainTextBox?.Text.Trim();
+  792:
+  793:         if (string.IsNullOrWhiteSpace(domain))
+  794:         {
+  795:             domain = GetSelectedJob()?.Domain;
+  796:         }
+  797:
+  798:         if (string.IsNullOrWhiteSpace(domain))
+  799:         {
+  800:             throw new InvalidOperationException(
+  801:                 "Укажите домен Spaceship или выберите задание.");
+  802:         }
+  803:
+  804:         await TestSpaceshipAsync(domain);
+  805:     }
+  806:
+  807:     private async Task TestSpaceshipAsync(string domain)
+  808:     {
+  809:         var settings = ReadSpaceshipSettings();
+  810:
+  811:         if (string.IsNullOrWhiteSpace(settings.ApiSecret))
+  812:         {
+  813:             throw new InvalidOperationException(
+  814:                 "Введите или сохраните Spaceship API Secret.");
+  815:         }
+  816:
+  817:         SaveSpaceshipSettings();
+  818:
+  819:         var relativePath = settings.DnsPath
+  820:             .Replace(
+  821:                 "{domain}",
+  822:                 Uri.EscapeDataString(domain),
+  823:                 StringComparison.OrdinalIgnoreCase)
+  824:             .TrimStart('/');
+  825:
+  826:         var baseUrl = settings.BaseUrl.TrimEnd('/');
+  827:         var requestUrl = baseUrl + "/" + relativePath;
+  828:
+  829:         SetBuild7Status(
+  830:             _build7Progress?.Value ?? 0,
+  831:             $"Spaceship API: чтение DNS-зоны {domain}.");
+  832:
+  833:         using var request = new HttpRequestMessage(
+  834:             HttpMethod.Get,
+  835:             requestUrl);
+  836:
+  837:         request.Headers.TryAddWithoutValidation(
+  838:             "X-API-Key",
+  839:             settings.ApiKey);
+  840:
+  841:         request.Headers.TryAddWithoutValidation(
+  842:             "X-API-Secret",
+  843:             settings.ApiSecret);
+  844:
+  845:         using var response =
+  846:             await _spaceshipHttpClient.SendAsync(
+  847:                 request,
+  848:                 HttpCompletionOption.ResponseHeadersRead);
+  849:
+  850:         var body = await response.Content.ReadAsStringAsync();
+  851:
+  852:         if (!response.IsSuccessStatusCode)
+  853:         {
+  854:             var safeBody = LimitAndRedact(
+  855:                 body,
+  856:                 settings.ApiKey,
+  857:                 settings.ApiSecret);
+  858:
+  859:             throw new InvalidOperationException(
+  860:                 $"Spaceship API вернул HTTP " +
+  861:                 $"{(int)response.StatusCode} " +
+  862:                 $"{response.ReasonPhrase}. {safeBody}");
+  863:         }
+  864:
+  865:         var resultDescription = DescribeJson(body);
+  866:
+  867:         SetBuild7Status(
+  868:             Math.Max(
+  869:                 1,
+  870:                 (int)(_build7Progress?.Value ?? 0)),
+  871:             $"Spaceship API доступен. Домен: {domain}. " +
+  872:             resultDescription);
+  873:
+  874:         AddLog(
+  875:             "INFO",
+  876:             domain,
+  877:             "Spaceship API: DNS-зона успешно прочитана.");
+  878:     }
+  879:
+  880:     private SpaceshipRuntimeSettings ReadSpaceshipSettings()
+  881:     {
+  882:         if (_spaceshipBaseUrlTextBox is null ||
+  883:             _spaceshipKeyTextBox is null ||
+  884:             _spaceshipSecretPasswordBox is null ||
+  885:             _spaceshipDnsPathTextBox is null)
+  886:         {
+  887:             throw new InvalidOperationException(
+  888:                 "Интерфейс Spaceship не инициализирован.");
+  889:         }
+  890:
+  891:         var stored = LoadSpaceshipSettingsFile();
+  892:
+  893:         var secret =
+  894:             _spaceshipSecretPasswordBox.Password;
+  895:
+  896:         if (string.IsNullOrEmpty(secret) &&
+  897:             !string.IsNullOrWhiteSpace(stored.EncryptedSecret))
+  898:         {
+  899:             secret = UnprotectSecret(
+  900:                 stored.EncryptedSecret);
+  901:         }
+  902:
+  903:         var settings = new SpaceshipRuntimeSettings
+  904:         {
+  905:             BaseUrl = _spaceshipBaseUrlTextBox.Text.Trim(),
+  906:             ApiKey = _spaceshipKeyTextBox.Text.Trim(),
+  907:             ApiSecret = secret,
+  908:             DnsPath = _spaceshipDnsPathTextBox.Text.Trim()
+  909:         };
+  910:
+  911:         if (!Uri.TryCreate(
+  912:                 settings.BaseUrl,
+  913:                 UriKind.Absolute,
+  914:                 out var uri) ||
+  915:             uri.Scheme != Uri.UriSchemeHttps)
+  916:         {
+  917:             throw new InvalidOperationException(
+  918:                 "Spaceship Base URL должен быть абсолютным HTTPS URL.");
+  919:         }
+  920:
+  921:         if (string.IsNullOrWhiteSpace(settings.ApiKey))
+  922:         {
+  923:             throw new InvalidOperationException(
+  924:                 "Не указан Spaceship API Key.");
+  925:         }
+  926:
+  927:         if (string.IsNullOrWhiteSpace(settings.DnsPath) ||
+  928:             !settings.DnsPath.Contains(
+  929:                 "{domain}",
+  930:                 StringComparison.OrdinalIgnoreCase))
+  931:         {
+  932:             throw new InvalidOperationException(
+  933:                 "DNS path должен содержать {domain}.");
+  934:         }
+  935:
+  936:         return settings;
+  937:     }
+  938:
+  939:     private void SaveSpaceshipSettings()
+  940:     {
+  941:         var settings = ReadSpaceshipSettings();
+  942:
+  943:         var stored = new SpaceshipStoredSettings
+  944:         {
+  945:             BaseUrl = settings.BaseUrl,
+  946:             ApiKey = settings.ApiKey,
+  947:             DnsPath = settings.DnsPath,
+  948:             EncryptedSecret = ProtectSecret(
+  949:                 settings.ApiSecret)
+  950:         };
+  951:
+  952:         var directory = Path.GetDirectoryName(
+  953:             SpaceshipSettingsPath);
+  954:
+  955:         if (string.IsNullOrWhiteSpace(directory))
+  956:         {
+  957:             throw new InvalidOperationException(
+  958:                 "Не удалось определить папку настроек.");
+  959:         }
+  960:
+  961:         Directory.CreateDirectory(directory);
+  962:
+  963:         var temporaryPath =
+  964:             SpaceshipSettingsPath + ".tmp";
+  965:
+  966:         var json = JsonSerializer.Serialize(
+  967:             stored,
+  968:             new JsonSerializerOptions
+  969:             {
+  970:                 WriteIndented = true
+  971:             });
+  972:
+  973:         File.WriteAllText(
+  974:             temporaryPath,
+  975:             json,
+  976:             new UTF8Encoding(false));
+  977:
+  978:         File.Move(
+  979:             temporaryPath,
+  980:             SpaceshipSettingsPath,
+  981:             true);
+  982:
+  983:         _spaceshipSecretPasswordBox?.Clear();
+  984:
+  985:         if (_spaceshipSecretStatus is not null)
+  986:         {
+  987:             _spaceshipSecretStatus.Text =
+  988:                 "API Secret сохранён и защищён Windows DPAPI.";
+  989:         }
+  990:     }
+  991:
+  992:     private void LoadSpaceshipSettings()
+  993:     {
+  994:         var stored = LoadSpaceshipSettingsFile();
+  995:
+  996:         if (_spaceshipBaseUrlTextBox is not null)
+  997:         {
+  998:             _spaceshipBaseUrlTextBox.Text =
+  999:                 string.IsNullOrWhiteSpace(stored.BaseUrl)
+ 1000:                     ? "https://spaceship.dev/api/v1"
+ 1001:                     : stored.BaseUrl;
+ 1002:         }
+ 1003:
+ 1004:         if (_spaceshipKeyTextBox is not null)
+ 1005:         {
+ 1006:             _spaceshipKeyTextBox.Text = stored.ApiKey;
+ 1007:         }
+ 1008:
+ 1009:         if (_spaceshipDnsPathTextBox is not null)
+ 1010:         {
+ 1011:             _spaceshipDnsPathTextBox.Text =
+ 1012:                 string.IsNullOrWhiteSpace(stored.DnsPath)
+ 1013:                     ? "dns/records/{domain}"
+ 1014:                     : stored.DnsPath;
+ 1015:         }
+ 1016:
+ 1017:         if (_spaceshipSecretStatus is not null)
+ 1018:         {
+ 1019:             _spaceshipSecretStatus.Text =
+ 1020:                 string.IsNullOrWhiteSpace(stored.EncryptedSecret)
+ 1021:                     ? "API Secret ещё не сохранён."
+ 1022:                     : "Зашифрованный API Secret сохранён.";
+ 1023:         }
+ 1024:     }
+ 1025:
+ 1026:     private SpaceshipStoredSettings LoadSpaceshipSettingsFile()
+ 1027:     {
+ 1028:         if (!File.Exists(SpaceshipSettingsPath))
+ 1029:         {
+ 1030:             return new SpaceshipStoredSettings();
+ 1031:         }
+ 1032:
+ 1033:         try
+ 1034:         {
+ 1035:             var json = File.ReadAllText(
+ 1036:                 SpaceshipSettingsPath,
+ 1037:                 Encoding.UTF8);
+ 1038:
+ 1039:             return JsonSerializer.Deserialize<
+ 1040:                        SpaceshipStoredSettings>(json) ??
+ 1041:                    new SpaceshipStoredSettings();
+ 1042:         }
+ 1043:         catch
+ 1044:         {
+ 1045:             return new SpaceshipStoredSettings();
+ 1046:         }
+ 1047:     }
+ 1048:
+ 1049:     private static string ProtectSecret(string value)
+ 1050:     {
+ 1051:         if (string.IsNullOrEmpty(value))
+ 1052:         {
+ 1053:             return string.Empty;
+ 1054:         }
+ 1055:
+ 1056:         var plainBytes = Encoding.UTF8.GetBytes(value);
+ 1057:
+ 1058:         try
+ 1059:         {
+ 1060:             var encrypted = ProtectedData.Protect(
+ 1061:                 plainBytes,
+ 1062:                 SpaceshipEntropy,
+ 1063:                 DataProtectionScope.CurrentUser);
+ 1064:
+ 1065:             return Convert.ToBase64String(encrypted);
+ 1066:         }
+ 1067:         finally
+ 1068:         {
+ 1069:             CryptographicOperations.ZeroMemory(plainBytes);
+ 1070:         }
+ 1071:     }
+ 1072:
+ 1073:     private static string UnprotectSecret(string value)
+ 1074:     {
+ 1075:         var encrypted = Convert.FromBase64String(value);
+ 1076:         var plainBytes = ProtectedData.Unprotect(
+ 1077:             encrypted,
+ 1078:             SpaceshipEntropy,
+ 1079:             DataProtectionScope.CurrentUser);
+ 1080:
+ 1081:         try
+ 1082:         {
+ 1083:             return Encoding.UTF8.GetString(plainBytes);
+ 1084:         }
+ 1085:         finally
+ 1086:         {
+ 1087:             CryptographicOperations.ZeroMemory(plainBytes);
+ 1088:         }
+ 1089:     }
+ 1090:
+--------------------
+ 1186:             _build7DomainButton.IsEnabled = enabled;
+ 1187:
+ 1188:         if (_build7UploadButton is not null)
+ 1189:             _build7UploadButton.IsEnabled = enabled;
+ 1190:
+ 1191:         if (_build7DatabaseButton is not null)
+ 1192:             _build7DatabaseButton.IsEnabled = enabled;
+ 1193:
+ 1194:         if (_build7SpaceshipButton is not null)
+ 1195:             _build7SpaceshipButton.IsEnabled = enabled;
+ 1196:
+ 1197:         if (_build7AllButton is not null)
+ 1198:             _build7AllButton.IsEnabled = enabled;
+ 1199:     }
+ 1200:
+ 1201:     private void ShowBuild7Error(
+ 1202:         string domain,
+ 1203:         Exception exception)
+ 1204:     {
+ 1205:         var message = SensitiveDataRedactor.Redact(
+ 1206:             exception.Message);
+ 1207:
+--------------------
+ 1283:             {
+ 1284:                 return nested;
+ 1285:             }
+ 1286:         }
+ 1287:
+ 1288:         return null;
+ 1289:     }
+ 1290:
+ 1291:     private static string SpaceshipSettingsPath =>
+ 1292:         Path.Combine(
+ 1293:             Environment.GetFolderPath(
+ 1294:                 Environment.SpecialFolder.LocalApplicationData),
+ 1295:             "TextFileProcessor",
+ 1296:             "spaceship-settings.json");
+ 1297:
+ 1298:     private static readonly byte[] SpaceshipEntropy =
+ 1299:         Encoding.UTF8.GetBytes(
+ 1300:             "TextFileProcessor.Spaceship.Build7.v1");
+ 1301:
+ 1302:     private sealed class SpaceshipRuntimeSettings
+ 1303:     {
+ 1304:         public string BaseUrl { get; init; } =
+ 1305:             "https://spaceship.dev/api/v1";
+ 1306:
+ 1307:         public string ApiKey { get; init; } = string.Empty;
+ 1308:
+ 1309:         public string ApiSecret { get; init; } = string.Empty;
+ 1310:
+ 1311:         public string DnsPath { get; init; } =
+ 1312:             "dns/records/{domain}";
+ 1313:     }
+ 1314:
+ 1315:     private sealed class SpaceshipStoredSettings
+ 1316:     {
+ 1317:         public string BaseUrl { get; set; } =
+ 1318:             "https://spaceship.dev/api/v1";
+ 1319:
+ 1320:         public string ApiKey { get; set; } = string.Empty;
+ 1321:
+ 1322:         public string EncryptedSecret { get; set; } =
+ 1323:             string.Empty;
+ 1324:
+ 1325:         public string DnsPath { get; set; } =
+ 1326:             "dns/records/{domain}";
+ 1327:     }
+ 1328: }
+ 1329: '@
+ 1330:
+ 1331: Set-Content `
+ 1332:     -LiteralPath $Build7File `
+ 1333:     -Value $build7Source `
+ 1334:     -Encoding UTF8
+ 1335:
+ 1336: Write-Host "Создан: $Build7File"
+ 1337:
+ 1338: Write-Step 'Очистка старой сборки'
+PS C:\WINDOWS\system32>
