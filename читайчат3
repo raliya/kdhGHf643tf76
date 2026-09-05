@@ -1,0 +1,2296 @@
+Получил ответ от инструмента
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+Размышление
+
+
+
+
+Причина текущего падения точно определена: run.sh создаётся в Windows с окончаниями строк CRLF, а Linux /bin/sh принимает только LF. Поэтому появляются $'\r': command not found и in\r.
+
+Сначала, если PowerShell показывает >>, нажмите Ctrl+C. Затем выполните эту команду одной строкой:
+
+$root='C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'; $db=Join-Path $root 'Services\DatabaseDeploymentService.cs'; $isp=Join-Path $root 'Services\IspmanagerAutomationService.cs'; $stamp=Get-Date -Format 'yyyyMMdd-HHmmss'; foreach($p in @($db,$isp)){if(!(Test-Path -LiteralPath $p)){throw ('Файл не найден: '+$p)}; Copy-Item -LiteralPath $p -Destination ($p+'.backup-'+$stamp) -Force}; $s=[IO.File]::ReadAllText($db); $pattern='new UTF8Encoding\(false\)\.GetBytes\(\s*scriptText\)\)\)'; $replacement='new UTF8Encoding(false).GetBytes(scriptText.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\r", "\n", StringComparison.Ordinal)))'; $count=[regex]::Matches($s,$pattern).Count; if($count -eq 1){$s=[regex]::Replace($s,$pattern,$replacement,1); [IO.File]::WriteAllText($db,$s,(New-Object Text.UTF8Encoding($true))); Write-Host 'Исправлены окончания строк run.sh: CRLF -> LF' -ForegroundColor Green}elseif($s.Contains('scriptText.Replace("\r\n", "\n"')){Write-Host 'Исправление LF уже установлено' -ForegroundColor Yellow}else{throw ('Не найден участок загрузки run.sh, совпадений: '+$count)}; $s=[IO.File]::ReadAllText($isp); $old='var aliases = $"*.{domain}";'; $new='var aliases = $"*.{domain} www.{domain}";'; if($s.Contains($old)){$s=$s.Replace($old,$new); [IO.File]::WriteAllText($isp,$s,(New-Object Text.UTF8Encoding($true))); Write-Host 'Псевдонимы исправлены: *.домен www.домен' -ForegroundColor Green}elseif($s.Contains($new)){Write-Host 'Псевдонимы уже исправлены' -ForegroundColor Yellow}else{throw 'Строка псевдонимов не найдена'}; Set-Location -LiteralPath $root; dotnet publish '.\TextFileProcessor.csproj' -c Release -r win-x64 --self-contained true
+
+После успешной сборки новый EXE находится здесь:
+
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\bin\Release\net8.0-windows\win-x64\publish\
+
+Что исправлено:
+
+run.sh перед отправкой принудительно преобразуется в Unix LF;
+ошибка $'\r': command not found устранена;
+псевдонимы создаются как *.домен www.домен;
+параметр перенаправления HTTP → HTTPS не передаётся, поэтому галочка остаётся выключенной;
+существующий site_ssl=on включает HTTPS, но сам по себе не выпускает wildcard-сертификат.
+Важно: в текущем исходнике создание БД всё ещё выполняется через серверный mgrctl db.edit, а не через HTTP API ispmanager. Это отдельная архитектурная замена; приведённая команда срочно восстанавливает создание БД и импорт SQL. Для wildcard-сертификата также потребуется отдельный API-вызов выпуска Let’s Encrypt с DNS-проверкой — наличие *.домен среди псевдонимов само сертификат не выпускает.
+
+Пожалуйста, пришлите следующий вопрос или результат выполнения команды — например, полный вывод dotnet publish либо новый журнал ошибки.
+
+Исправлены окончания строк run.sh: CRLF -> LF
+Псевдонимы исправлены: *.домен www.домен
+Определение проектов для восстановления...
+Все проекты обновлены для восстановления.
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\DatabaseDeploymentService.cs(245,26): error CS100
+3: Синтаксическая ошибка, требуется "," [C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\TextFileProcessor
+.csproj]
+C:\Users\User\Desktop\Adminki\. Прог...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Навык активирован: page_content
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+Размышление
+
+
+Проверил предыдущий чат и исходник в репозитории. Ошибка появилась в участке преобразования CRLF → LF: предыдущая автоматическая замена повредила выражение C# около строк 245–246.
+
+Если PowerShell показывает приглашение >>, сначала нажмите Ctrl+C. Затем вставьте весь блок целиком:
+
+$ErrorActionPreference = 'Stop'
+
+$root = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$dbFile = Join-Path $root 'Services\DatabaseDeploymentService.cs'
+$projectFile = Join-Path $root 'TextFileProcessor.csproj'
+$publishDir = Join-Path $root 'publish\win-x64'
+$dotnetExe = 'C:\Program Files\dotnet\dotnet.exe'
+
+if (-not (Test-Path -LiteralPath $dbFile -PathType Leaf)) {
+    throw "Файл не найден: $dbFile"
+}
+
+if (-not (Test-Path -LiteralPath $projectFile -PathType Leaf)) {
+    throw "Проект не найден: $projectFile"
+}
+
+if (-not (Test-Path -LiteralPath $dotnetExe -PathType Leaf)) {
+    throw "Не найден .NET SDK: $dotnetExe"
+}
+
+$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$backup = "$dbFile.backup-$stamp"
+Copy-Item -LiteralPath $dbFile -Destination $backup -Force
+
+Write-Host "Резервная копия: $backup" -ForegroundColor Cyan
+
+$text = [System.IO.File]::ReadAllText($dbFile)
+
+# Полностью заменяем потенциально повреждённый участок создания run.sh.
+$pattern = '(?s)[ \t]*using\s*\(var\s+scriptStream\s*=\s*new\s+MemoryStream\s*\(.*?\)\)\s*\{\s*sftp\.UploadFile\s*\(\s*scriptStream\s*,\s*remoteScript\s*,\s*true\s*\)\s*;\s*\}'
+
+$replacement = @'
+            var normalizedScriptText = scriptText
+                .Replace(
+                    "\r\n",
+                    "\n",
+                    StringComparison.Ordinal)
+                .Replace(
+                    "\r",
+                    "\n",
+                    StringComparison.Ordinal);
+
+            using (var scriptStream = new MemoryStream(
+                       new UTF8Encoding(false).GetBytes(
+                           normalizedScriptText)))
+            {
+                sftp.UploadFile(
+                    scriptStream,
+                    remoteScript,
+                    true);
+            }
+'@
+
+$matches = [regex]::Matches($text, $pattern)
+
+if ($matches.Count -ne 1) {
+    Write-Host "`nУчасток около строк 235–255:" -ForegroundColor Yellow
+
+    $lines = [System.IO.File]::ReadAllLines($dbFile)
+    for ($i = 224; $i -lt [Math]::Min(260, $lines.Length); $i++) {
+        Write-Host ('{0,4}: {1}' -f ($i + 1), $lines[$i])
+    }
+
+    throw "Не удалось однозначно найти повреждённый блок. Найдено совпадений: $($matches.Count)"
+}
+
+$text = [regex]::Replace(
+    $text,
+    $pattern,
+    [System.Text.RegularExpressions.MatchEvaluator]{
+        param($match)
+        return $replacement
+    },
+    1
+)
+
+# Исправляем регулярные выражения имён БД, если в файле остались
+# повреждённые варианты из репозитория.
+$namePattern = '(?s)private static readonly Regex DatabaseNameRegex\s*=\s*new\(.*?RegexOptions\.CultureInvariant\);'
+$nameReplacement = @'
+private static readonly Regex DatabaseNameRegex = new(
+        @"^[A-Za-z0-9_]{1,64}$",
+        RegexOptions.Compiled |
+        RegexOptions.CultureInvariant);
+'@
+
+$userPattern = '(?s)private static readonly Regex DatabaseUserRegex\s*=\s*new\(.*?RegexOptions\.CultureInvariant\);'
+$userReplacement = @'
+private static readonly Regex DatabaseUserRegex = new(
+        @"^[A-Za-z0-9_]{1,64}$",
+        RegexOptions.Compiled |
+        RegexOptions.CultureInvariant);
+'@
+
+if ([regex]::Matches($text, $namePattern).Count -ne 1) {
+    throw 'Не удалось найти объявление DatabaseNameRegex.'
+}
+
+if ([regex]::Matches($text, $userPattern).Count -ne 1) {
+    throw 'Не удалось найти объявление DatabaseUserRegex.'
+}
+
+$text = [regex]::Replace(
+    $text,
+    $namePattern,
+    [System.Text.RegularExpressions.MatchEvaluator]{
+        param($match)
+        return $nameReplacement
+    },
+    1
+)
+
+$text = [regex]::Replace(
+    $text,
+    $userPattern,
+    [System.Text.RegularExpressions.MatchEvaluator]{
+        param($match)
+        return $userReplacement
+    },
+    1
+)
+
+# Одинарные кавычки не позволяют Linux shell раскрыть $DB_PASSWORD.
+# В raw string C# двойные кавычки разрешены без экранирования.
+$text = $text.Replace(
+    "-e 'password=`$DB_PASSWORD'",
+    '-e "password=$DB_PASSWORD"'
+)
+
+$text = $text.Replace(
+    "-e 'confirm=`$DB_PASSWORD'",
+    '-e "confirm=$DB_PASSWORD"'
+)
+
+# Сохраняем исходник как UTF-8 с BOM.
+$utf8Bom = New-Object System.Text.UTF8Encoding($true)
+[System.IO.File]::WriteAllText(
+    $dbFile,
+    $text,
+    $utf8Bom
+)
+
+Write-Host 'DatabaseDeploymentService.cs исправлен.' -ForegroundColor Green
+
+# Показываем исправленный участок.
+$lines = [System.IO.File]::ReadAllLines($dbFile)
+$normalizedLine = -1
+
+for ($i = 0; $i -lt $lines.Length; $i++) {
+    if ($lines[$i] -match 'var normalizedScriptText') {
+        $normalizedLine = $i
+        break
+    }
+}
+
+if ($normalizedLine -ge 0) {
+    Write-Host "`nИсправленный участок:" -ForegroundColor Cyan
+
+    $end = [Math]::Min(
+        $normalizedLine + 24,
+        $lines.Length
+    )
+
+    for ($i = $normalizedLine; $i -lt $end; $i++) {
+        Write-Host ('{0,4}: {1}' -f ($i + 1), $lines[$i])
+    }
+}
+
+$env:DOTNET_ROOT = 'C:\Program Files\dotnet'
+$env:Path = "C:\Program Files\dotnet;$env:Path"
+
+Set-Location -LiteralPath $root
+
+Write-Host "`nОчистка предыдущей сборки..." -ForegroundColor Cyan
+& $dotnetExe clean $projectFile -c Release
+
+if ($LASTEXITCODE -ne 0) {
+    throw "dotnet clean завершился с кодом $LASTEXITCODE"
+}
+
+if (Test-Path -LiteralPath (Join-Path $root 'obj')) {
+    Remove-Item -LiteralPath (Join-Path $root 'obj') -Recurse -Force
+}
+
+if (Test-Path -LiteralPath $publishDir) {
+    Remove-Item -LiteralPath $publishDir -Recurse -Force
+}
+
+Write-Host "`nПроверочная сборка..." -ForegroundColor Cyan
+& $dotnetExe build $projectFile `
+    -c Release `
+    -r win-x64
+
+if ($LASTEXITCODE -ne 0) {
+    throw "dotnet build завершился с кодом $LASTEXITCODE"
+}
+
+Write-Host "`nПубликация EXE..." -ForegroundColor Cyan
+& $dotnetExe publish $projectFile `
+    -c Release `
+    -r win-x64 `
+    --self-contained true `
+    --output $publishDir `
+    -p:PublishSingleFile=true `
+    -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:EnableCompressionInSingleFile=true
+
+if ($LASTEXITCODE -ne 0) {
+    throw "dotnet publish завершился с кодом $LASTEXITCODE"
+}
+
+$exe = Join-Path $publishDir 'TextFileProcessor.exe'
+
+if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+    throw "Сборка завершена, но EXE не найден: $exe"
+}
+
+Write-Host "`nСБОРКА УСПЕШНО ЗАВЕРШЕНА" -ForegroundColor Green
+Write-Host "EXE: $exe" -ForegroundColor Yellow
+Write-Host "Резервная копия: $backup" -ForegroundColor DarkGray
+
+Start-Process explorer.exe -ArgumentList "/select,`"$exe`""
+
+Исправленный код теперь сначала создаёт отдельную переменную:
+
+var normalizedScriptText = scriptText
+    .Replace("\r\n", "\n", StringComparison.Ordinal)
+    .Replace("\r", "\n", StringComparison.Ordinal);
+
+И только после этого формирует поток. Такой вариант устраняет синтаксическую ошибку и гарантирует Unix-окончания строк в run.sh.
+
+Готовый файл должен появиться здесь:
+
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\publish\win-x64\TextFileProcessor.exe
+
+Старый BUILD7.ps1 пока повторно не запускайте: он может снова перезаписать исправленный DatabaseDeploymentService.cs.
+
+05.09.2026 16:47:09 ERROR casino71.cfd Серверная команда завершилась с кодом 1: Type: 'The environment variable name for the 'password' parameter is invalid.' ISPmanager не создал базу данных.
+
+
+gjxtve 'nf jib,rf&
+базы нет!
+GPT-5.6 Sol
+GPT-5.6 Sol
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+Навык активирован: web_search
+get_serp
+Поисковая выдача
+Результаты (10)
+get_page_content
+Содержимое страницы
+Да, причина найдена точно. В mgrctl параметр -e принимает имя переменной окружения, а программа передала её значение:
+
+-e "password=$DB_PASSWORD"
+
+Из-за этого ISPmanager попытался использовать содержимое пароля как имя переменной и сообщил:
+
+The environment variable name for the 'password' parameter is invalid.
+
+Правильный синтаксис:
+
+-e password=DB_PASSWORD
+-e confirm=DB_PASSWORD
+
+Переменная DB_PASSWORD у вас уже экспортируется строкой export DB_PASSWORD.
+
+Закройте запущенную программу. Затем вставьте в PowerShell весь блок целиком:
+
+$ErrorActionPreference = 'Stop'
+
+$root = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$file = Join-Path $root 'Services\DatabaseDeploymentService.cs'
+$project = Join-Path $root 'TextFileProcessor.csproj'
+$publish = Join-Path $root 'publish\win-x64'
+$dotnet = 'C:\Program Files\dotnet\dotnet.exe'
+
+if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
+    throw "Файл не найден: $file"
+}
+
+if (-not (Test-Path -LiteralPath $project -PathType Leaf)) {
+    throw "Проект не найден: $project"
+}
+
+if (-not (Test-Path -LiteralPath $dotnet -PathType Leaf)) {
+    throw "Не найден .NET SDK: $dotnet"
+}
+
+$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$backup = "$file.backup-$stamp"
+
+Copy-Item `
+    -LiteralPath $file `
+    -Destination $backup `
+    -Force
+
+Write-Host "Резервная копия: $backup" -ForegroundColor Cyan
+
+$lines = [System.IO.File]::ReadAllLines($file)
+$passwordFixed = 0
+$confirmFixed = 0
+
+for ($i = 0; $i -lt $lines.Length; $i++) {
+    $line = $lines[$i]
+    $indent = [regex]::Match($line, '^\s*').Value
+    $trimmed = $line.Trim()
+
+    if (
+        $trimmed -match '^-e\s+.*password=.*DB_PASSWORD.*\\$' -or
+        $trimmed -match '^password=.*DB_PASSWORD.*\\$'
+    ) {
+        $lines[$i] = $indent + '-e password=DB_PASSWORD \'
+        $passwordFixed++
+        continue
+    }
+
+    if (
+        $trimmed -match '^-e\s+.*confirm=.*DB_PASSWORD.*\\$' -or
+        $trimmed -match '^confirm=.*DB_PASSWORD.*\\$'
+    ) {
+        $lines[$i] = $indent + '-e confirm=DB_PASSWORD \'
+        $confirmFixed++
+    }
+}
+
+if ($passwordFixed -ne 1 -or $confirmFixed -ne 1) {
+    Write-Host "`nНайденные строки с password/confirm:" -ForegroundColor Yellow
+
+    for ($i = 0; $i -lt $lines.Length; $i++) {
+        if (
+            $lines[$i] -match 'password|confirm|DB_PASSWORD'
+        ) {
+            Write-Host ('{0,4}: {1}' -f ($i + 1), $lines[$i])
+        }
+    }
+
+    throw (
+        "Исправление остановлено: password=$passwordFixed, " +
+        "confirm=$confirmFixed. Ожидалось по одному совпадению."
+    )
+}
+
+# Дополнительно гарантируем Unix LF для создаваемого run.sh.
+$text = [string]::Join(
+    [Environment]::NewLine,
+    $lines
+)
+
+$oldUpload = @'
+new UTF8Encoding(false).GetBytes(
+                           scriptText)
+'@
+
+$newUpload = @'
+new UTF8Encoding(false).GetBytes(
+                           scriptText
+                               .Replace(
+                                   "\r\n",
+                                   "\n",
+                                   StringComparison.Ordinal)
+                               .Replace(
+                                   "\r",
+                                   "\n",
+                                   StringComparison.Ordinal))
+'@
+
+if ($text.Contains($oldUpload)) {
+    $text = $text.Replace($oldUpload, $newUpload)
+    Write-Host 'Добавлено преобразование run.sh в Unix LF.' -ForegroundColor Green
+}
+elseif (
+    $text.Contains('normalizedScriptText') -or
+    $text.Contains('scriptText.Replace(') -or
+    $text.Contains('scriptText' + [Environment]::NewLine + '                               .Replace(')
+) {
+    Write-Host 'Преобразование run.sh в Unix LF уже установлено.' -ForegroundColor Yellow
+}
+else {
+    Write-Warning 'Участок преобразования LF не изменён. Исправление mgrctl продолжено.'
+}
+
+$utf8Bom = New-Object System.Text.UTF8Encoding($true)
+
+[System.IO.File]::WriteAllText(
+    $file,
+    $text,
+    $utf8Bom
+)
+
+Write-Host "`nИсправлены строки mgrctl:" -ForegroundColor Green
+Write-Host '  -e password=DB_PASSWORD \' -ForegroundColor Cyan
+Write-Host '  -e confirm=DB_PASSWORD \' -ForegroundColor Cyan
+
+# Контроль результата.
+$resultLines = [System.IO.File]::ReadAllLines($file)
+
+Write-Host "`nПроверка соответствующего участка:" -ForegroundColor Cyan
+
+for ($i = 0; $i -lt $resultLines.Length; $i++) {
+    if (
+        $resultLines[$i] -match 'export DB_PASSWORD' -or
+        $resultLines[$i] -match '\-e password=DB_PASSWORD' -or
+        $resultLines[$i] -match '\-e confirm=DB_PASSWORD'
+    ) {
+        Write-Host ('{0,4}: {1}' -f ($i + 1), $resultLines[$i])
+    }
+}
+
+$env:DOTNET_ROOT = 'C:\Program Files\dotnet'
+$env:Path = "C:\Program Files\dotnet;$env:Path"
+
+Set-Location -LiteralPath $root
+
+Write-Host "`nУдаление старой публикации..." -ForegroundColor Cyan
+
+if (Test-Path -LiteralPath $publish) {
+    Remove-Item `
+        -LiteralPath $publish `
+        -Recurse `
+        -Force
+}
+
+Write-Host "`nСборка проекта..." -ForegroundColor Cyan
+
+& $dotnet build `
+    $project `
+    -c Release `
+    -r win-x64
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Сборка завершилась с кодом $LASTEXITCODE"
+}
+
+Write-Host "`nПубликация нового EXE..." -ForegroundColor Cyan
+
+& $dotnet publish `
+    $project `
+    -c Release `
+    -r win-x64 `
+    --self-contained true `
+    --output $publish `
+    -p:PublishSingleFile=true `
+    -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:EnableCompressionInSingleFile=true
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Публикация завершилась с кодом $LASTEXITCODE"
+}
+
+$exe = Join-Path $publish 'TextFileProcessor.exe'
+
+if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+    throw "Новый EXE не найден: $exe"
+}
+
+Write-Host "`nГОТОВО — ОШИБКА ПЕРЕДАЧИ ПАРОЛЯ ИСПРАВЛЕНА" `
+    -ForegroundColor Green
+
+Write-Host "`nНовый EXE:" -ForegroundColor Green
+Write-Host $exe -ForegroundColor Yellow
+
+Write-Host "`nРезервная копия исходника:" -ForegroundColor DarkGray
+Write-Host $backup -ForegroundColor DarkGray
+
+Start-Process explorer.exe -ArgumentList "/select,`"$exe`""
+
+После сборки запускайте именно новый файл:
+
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\publish\win-x64\TextFileProcessor.exe
+
+Не запускайте старый EXE из bin и не запускайте снова BUILD7.ps1, иначе он может вернуть ошибочные строки.
+
+В исправленном run.sh должно быть:
+
+export DB_PASSWORD
+
+/usr/local/mgr5/sbin/mgrctl \
+    -m ispmgr \
+    db.edit \
+    name="$DATABASE_NAME" \
+    owner="$DATABASE_OWNER" \
+    server="MySQL" \
+    charset="utf8mb4" \
+    user="*" \
+    username="$DATABASE_USER" \
+    -e password=DB_PASSWORD \
+    -e confirm=DB_PASSWORD \
+    hide_remote_access=on \
+    remote_access=off \
+    sok=ok
+
+Пароль при этом не помещается непосредственно в аргументы процесса: mgrctl получает его из экспортированной переменной окружения DB_PASSWORD.
+
+05.09.2026 16:59:12 ERROR casino71.cfd Серверная команда завершилась с кодом 1: Type: 'The environment variable name for the 'password' parameter is invalid.' ISPmanager не создал базу данных.
+
+!!!!!!!
+GPT-5.6 Sol
+GPT-5.6 Sol
+get_serp
+Поисковая выдача
+Результаты (10)
+get_serp
+Поисковая выдача
+Результаты (3)
+get_serp
+Поисковая выдача
+Результаты (1)
+Навык активирован: page_content
+get_page_content
+Содержимое страницы
+Размышление
+
+
+Вы правы — предыдущая правка была неверной. Я ошибочно указал:
+
+-e password=DB_PASSWORD
+
+По официальному синтаксису mgrctl нужно передавать:
+
+-e 'password=$DB_PASSWORD'
+
+Одинарные кавычки обязательны: они не дают оболочке заменить $DB_PASSWORD значением пароля до запуска mgrctl.
+
+Правильный фрагмент
+export DB_PASSWORD
+
+/usr/local/mgr5/sbin/mgrctl \
+    -m ispmgr \
+    db.edit \
+    name="$DATABASE_NAME" \
+    owner="$DATABASE_OWNER" \
+    server="MySQL" \
+    charset="utf8mb4" \
+    user="*" \
+    username="$DATABASE_USER" \
+    -e 'password=$DB_PASSWORD' \
+    -e 'confirm=$DB_PASSWORD' \
+    hide_remote_access=on \
+    remote_access=off \
+    sok=ok
+
+Исправьте и пересоберите программу следующим PowerShell-блоком:
+
+$ErrorActionPreference = 'Stop'
+
+$root = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$file = Join-Path $root 'Services\DatabaseDeploymentService.cs'
+$project = Join-Path $root 'TextFileProcessor.csproj'
+$publish = Join-Path $root 'publish\win-x64'
+$dotnet = 'C:\Program Files\dotnet\dotnet.exe'
+
+if (-not (Test-Path -LiteralPath $file)) {
+    throw "Не найден файл: $file"
+}
+
+$backup = "$file.backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+Copy-Item -LiteralPath $file -Destination $backup -Force
+
+$lines = [System.IO.File]::ReadAllLines($file)
+
+$passwordCount = 0
+$confirmCount = 0
+
+for ($i = 0; $i -lt $lines.Length; $i++) {
+    $indent = [regex]::Match($lines[$i], '^\s*').Value
+
+    if (
+        $lines[$i] -match '\-e\s+.*password=.*DB_PASSWORD' -and
+        $lines[$i] -notmatch 'confirm='
+    ) {
+        $lines[$i] =
+            $indent +
+            "-e 'password=`$DB_PASSWORD' " +
+            '\'
+
+        $passwordCount++
+        continue
+    }
+
+    if ($lines[$i] -match '\-e\s+.*confirm=.*DB_PASSWORD') {
+        $lines[$i] =
+            $indent +
+            "-e 'confirm=`$DB_PASSWORD' " +
+            '\'
+
+        $confirmCount++
+    }
+}
+
+if ($passwordCount -lt 1 -or $confirmCount -lt 1) {
+    Write-Host 'Строки с DB_PASSWORD:' -ForegroundColor Yellow
+
+    for ($i = 0; $i -lt $lines.Length; $i++) {
+        if ($lines[$i] -match 'DB_PASSWORD') {
+            Write-Host ('{0,4}: {1}' -f ($i + 1), $lines[$i])
+        }
+    }
+
+    throw (
+        "Не удалось исправить команды автоматически. " +
+        "password=$passwordCount; confirm=$confirmCount"
+    )
+}
+
+$utf8Bom = New-Object System.Text.UTF8Encoding($true)
+
+[System.IO.File]::WriteAllLines(
+    $file,
+    $lines,
+    $utf8Bom
+)
+
+Write-Host "`nПроверка исправления:" -ForegroundColor Cyan
+
+$check = [System.IO.File]::ReadAllLines($file)
+
+for ($i = 0; $i -lt $check.Length; $i++) {
+    if ($check[$i] -match '\-e.*(password|confirm)') {
+        Write-Host ('{0,4}: {1}' -f ($i + 1), $check[$i])
+    }
+}
+
+if (-not ($check -match "\-e 'password=\`$DB_PASSWORD'")) {
+    throw 'Правильная строка password после записи не обнаружена.'
+}
+
+if (-not ($check -match "\-e 'confirm=\`$DB_PASSWORD'")) {
+    throw 'Правильная строка confirm после записи не обнаружена.'
+}
+
+$env:DOTNET_ROOT = 'C:\Program Files\dotnet'
+$env:Path = "C:\Program Files\dotnet;$env:Path"
+
+Set-Location -LiteralPath $root
+
+Get-Process TextFileProcessor -ErrorAction SilentlyContinue |
+    Stop-Process -Force
+
+if (Test-Path -LiteralPath $publish) {
+    Remove-Item -LiteralPath $publish -Recurse -Force
+}
+
+& $dotnet publish `
+    $project `
+    -c Release `
+    -r win-x64 `
+    --self-contained true `
+    --output $publish `
+    -p:PublishSingleFile=true `
+    -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:EnableCompressionInSingleFile=true
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Публикация завершилась с кодом $LASTEXITCODE"
+}
+
+$exe = Join-Path $publish 'TextFileProcessor.exe'
+
+if (-not (Test-Path -LiteralPath $exe)) {
+    throw "Новый EXE не найден: $exe"
+}
+
+Write-Host "`nГОТОВО" -ForegroundColor Green
+Write-Host "Новый EXE: $exe" -ForegroundColor Yellow
+Write-Host "Копия исходника: $backup" -ForegroundColor DarkGray
+
+Start-Process explorer.exe -ArgumentList "/select,`"$exe`""
+
+В выводе проверки должны быть ровно такие строки:
+
+-e 'password=$DB_PASSWORD' \
+-e 'confirm=$DB_PASSWORD' \
+
+После этого запускайте только:
+
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\publish\win-x64\TextFileProcessor.exe
+
+Ошибка возникала потому, что:
+
+"password=$DB_PASSWORD" — оболочка подставляет сам пароль, и mgrctl считает его именем переменной;
+password=DB_PASSWORD — отсутствует обязательный символ $;
+'password=$DB_PASSWORD' — корректный вариант для mgrctl.
+Навык активирован: web_search
+get_serp
+Поисковая выдача
+Результаты (10)
+get_serp
+Поисковая выдача
+Результаты (10)
+get_serp
+Поисковая выдача
+Результаты (8)
+Размышление
+
+
+get_page_content
+05.09.2026 17:26:23 ERROR casino71.cfd Серверная команда завершилась с кодом 2: Ожидание готовности БД: попытка 1 из 20. MySQL: ERROR 1045 (28000): Access denied for user 'casino71cfd'@'localhost' (using password=*** Ожидание готовности БД: попытка 2 из 20. MySQL: ERROR 1045 (28000): Access denied for user 'casino71cfd'@'localhost' (using password=*** Ожидание готовности БД: попытка 3 из 20. MySQL: ERROR 1045 (28000): Access denied for user 'casino71cfd'@&...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Понял требуемое поведение. По логу сейчас есть две отдельные ошибки:
+
+База создаётся, но пароль пользователя MySQL не совпадает с паролем, который приложение передаёт при импорте.
+Spaceship DNS-зона только читается, но TXT-записи _acme-challenge фактически не создаются/обновляются через API, поэтому Wildcard-сертификат не может пройти DNS-проверку.
+Я не могу исправить EXE без исходников и не имею доступа к вашему локальному пути C:\Users\User\.... Пришлите архив проекта — как минимум:
+
+*.csproj;
+все *.cs;
+скрипт серверной команды;
+код вызова mgrctl;
+код Spaceship API;
+код кнопки «Запустить все процессы».
+Не отправляйте реальные пароли, API-ключи, приватные ключи и содержимое .env. Архив можно подготовить так:
+
+$src = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$out = "$env:USERPROFILE\Desktop\TextFileProcessor-source.zip"
+$tmp = Join-Path $env:TEMP 'TextFileProcessor-source'
+
+Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+New-Item $tmp -ItemType Directory | Out-Null
+
+Get-ChildItem $src -Recurse -File |
+    Where-Object {
+        $_.FullName -notmatch '\\(bin|obj|publish|\.git)\\' -and
+        $_.Name -notmatch '^(\.env|appsettings\..+\.json)$' -and
+        $_.Extension -notin '.pfx', '.p12', '.key'
+    } |
+    ForEach-Object {
+        $relative = $_.FullName.Substring($src.Length).TrimStart('\')
+        $target = Join-Path $tmp $relative
+        New-Item (Split-Path $target) -ItemType Directory -Force | Out-Null
+        Copy-Item $_.FullName $target
+    }
+
+Compress-Archive "$tmp\*" $out -Force
+Write-Host "Архив создан: $out"
+
+Исправление должно реализовать именно следующее:
+
+пароль БД генерируется один раз и это же значение передаётся в mgrctl, проверку подключения и импорт SQL;
+аргументы mgrctl сохраняют буквальное $DB_PASSWORD, без преждевременной подстановки оболочкой;
+после создания пользователя выполняется реальная проверка MySQL; 20 повторов не маскируют ERROR 1045;
+при создании домена обязательно запрашивается Wildcard: domain и *.domain;
+из задания ISPmanager извлекаются TXT-записи _acme-challenge;
+записи создаются либо обновляются в Spaceship через API, а не только читается зона;
+после DNS-публикации выполняется проверка TXT, затем продолжается выпуск сертификата;
+одна строка задания запускается ровно один раз;
+повторное добавление того же домена создаёт новое отдельное задание и запускает его ещё один раз;
+«Запустить все процессы» обрабатывает только выбранные задания, каждое по одному разу;
+выполнение последующих заданий останавливается только при фактической ошибке;
+повторное нажатие не запускает уже выполненные задания, если они не были добавлены заново.
+Пришлите архив проекта, и я смогу дать конкретные исправленные файлы, а не предположительный фрагмент.
+
+для освежения все работы смотри предыдущий чат и всю работу в файле: Предыдущий чат.txt тут: https://github.com/raliya/kdhGHf643tf76.git
+GPT-5.6 Sol
+GPT-5.6 Sol
+Навык активирован: page_content
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+Размышление
+
+
+Принял. Репозиторий и файл «Предыдущий чат.txt» просмотрел; повторно пересылать историю не нужно. Дальше считаю GitHub-репозиторий текущей базой проекта:
+
+https://github.com/raliya/kdhGHf643tf76
+
+По исходникам подтвердились проблемы:
+
+Сборка 7 фактически не добавлена в проект: MainWindow.Build7.cs отсутствует, а в MainWindow.xaml.cs вызывается только InitializeBuild6().
+Реализация Spaceship из предыдущего чата выполняла только GET DNS-зоны. Она не извлекала TXT из ISPmanager и не отправляла их в Spaceship.
+site_aliases = *.domain создаёт wildcard-псевдоним сайта, но это не означает заказ Wildcard SSL-сертификата.
+Общий процесс построен через вызовы async void-обработчиков. Из-за этого невозможно надёжно определить успешность этапа, остановить очередь именно при ошибке и исключить повторный запуск.
+Этапы загрузки и БД показывают отдельные подтверждения — это мешает автоматическому общему запуску.
+В DatabaseDeploymentService.cs нужно отдельно исправить создание/синхронизацию пользователя MySQL. Повторять подключение после ERROR 1045 двадцать раз бессмысленно: это ошибка реквизитов, а не ожидание запуска БД.
+Передачу mgrctl -e 'password=$DB_PASSWORD'` нельзя бездумно заменять на двойные кавычки: `$DB_PASSWORD должен передаваться mgrctl как ссылка на экспортированную переменную окружения.
+Сейчас отсутствует нормальное состояние выполнения для конкретного экземпляра задания. Оно должно привязываться к ID задания, а не только к имени домена.
+Требуемую логику зафиксировал:
+
+Каждое добавление строки домена создаёт отдельное задание с уникальным ID.
+Одно задание за один запуск проходит цепочку только один раз.
+Повторное добавление того же домена — новое задание и ещё один запуск.
+«Запустить все процессы» запускает только выбранные задания.
+Очередь продолжается после успешного задания и останавливается только при реальной ошибке или ручной отмене.
+Для домена должен заказываться сертификат на:
+domain.tld;
+*.domain.tld.
+TXT _acme-challenge необходимо:
+получить из ISPmanager/процесса ACME;
+создать либо обновить через Spaceship API;
+проверить через DNS;
+только после этого продолжить выпуск сертификата.
+Пароль из config.php должен использоваться одинаково при создании пользователя, проверке соединения и импорте SQL.
+При ERROR 1045 нужно исправить пароль/права пользователя, а не выполнять двадцать одинаковых проверок.
+Также учту, что рабочий проект расположен здесь:
+
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка
+
+а итоговый EXE должен публиковаться сюда:
+
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\publish\win-x64\TextFileProcessor.exe
+
+Важно: репозиторий публичный. Не размещайте в нём Spaceship API Secret, пароли SSH/ISPmanager, содержимое локальных настроек DPAPI, .env, сертификаты или приватные ключи.
+
+nfr ;t nfv ghjxnb b 'nj Читайчат2.txt
+жду исправления!
+GPT-5.6 Sol
+GPT-5.6 Sol
+Навык активирован: page_content
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+Размышление
+
+
+
+
+Прочитал «Читайчат2.txt» полностью. Текущая ошибка связана с тем, что программа считает любую ошибку подключения признаком отсутствующей БД. При ERROR 1045 она повторно вызывает создание, но пароль уже существующего пользователя не синхронизируется.
+
+Закройте TextFileProcessor.exe, затем вставьте в PowerShell целиком следующий блок. Он:
+
+создаёт резервные копии;
+исправляет CRLF в run.sh;
+сначала пытается синхронизировать существующую БД и пользователя через db.edit elid=...;
+создаёт БД только тогда, когда редактирование невозможно;
+использует один пароль из config.php для ISPmanager, проверки и импорта;
+убирает бессмысленные 20 повторений при ERROR 1045;
+добавляет алиасы www.домен и *.домен;
+собирает новый EXE в требуемую папку.
+$ErrorActionPreference = 'Stop'
+
+$root = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$dbFile = Join-Path $root 'Services\DatabaseDeploymentService.cs'
+$ispFile = Join-Path $root 'Services\IspmanagerAutomationService.cs'
+$project = Join-Path $root 'TextFileProcessor.csproj'
+$publish = Join-Path $root 'publish\win-x64'
+$dotnet = 'C:\Program Files\dotnet\dotnet.exe'
+
+foreach ($path in @($dbFile, $ispFile, $project, $dotnet)) {
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        throw "Не найден файл: $path"
+    }
+}
+
+Get-Process TextFileProcessor -ErrorAction SilentlyContinue |
+    Stop-Process -Force
+
+$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+
+Copy-Item -LiteralPath $dbFile `
+    -Destination "$dbFile.backup-$stamp" -Force
+
+Copy-Item -LiteralPath $ispFile `
+    -Destination "$ispFile.backup-$stamp" -Force
+
+Write-Host 'Резервные копии созданы.' -ForegroundColor Cyan
+
+# ------------------------------------------------------------------
+# 1. Исправление DatabaseDeploymentService.cs
+# ------------------------------------------------------------------
+
+$text = [System.IO.File]::ReadAllText($dbFile)
+
+$methodPattern = @'
+(?s)    private static string CreateRemoteScript\(\s*string databaseName,\s*string databaseUser,\s*string owner,\s*string remoteSql,\s*string remoteSecret\)\s*\{.*?(?=    private static string ReadPhpValue\()
+'@
+
+$newMethod = @'
+    private static string CreateRemoteScript(
+        string databaseName,
+        string databaseUser,
+        string owner,
+        string remoteSql,
+        string remoteSecret)
+    {
+        return
+$"""
+#!/bin/sh
+set -u
+
+DATABASE_NAME={ShellQuote(databaseName)}
+DATABASE_USER={ShellQuote(databaseUser)}
+DATABASE_OWNER={ShellQuote(owner)}
+REMOTE_SQL={ShellQuote(remoteSql)}
+SECRET_FILE={ShellQuote(remoteSecret)}
+
+if [ ! -f "$REMOTE_SQL" ]; then
+    echo "SQL-файл не найден." >&2
+    exit 31
+fi
+
+if [ ! -f "$SECRET_FILE" ]; then
+    echo "Файл с паролем БД не найден." >&2
+    exit 32
+fi
+
+DB_PASSWORD="$(cat -- "$SECRET_FILE")"
+
+if [ -z "$DB_PASSWORD" ]; then
+    echo "Пароль базы данных пуст." >&2
+    exit 33
+fi
+
+export MYSQL_PWD="$DB_PASSWORD"
+export DB_PASSWORD
+
+if command -v mariadb >/dev/null 2>&1; then
+    DB_CLIENT="mariadb"
+elif command -v mysql >/dev/null 2>&1; then
+    DB_CLIENT="mysql"
+else
+    echo "Не найден клиент mariadb или mysql." >&2
+    exit 34
+fi
+
+check_database_access()
+{
+    "$DB_CLIENT" \
+        --connect-timeout=10 \
+        --user="$DATABASE_USER" \
+        --database="$DATABASE_NAME" \
+        --execute="SELECT 1" \
+        >/dev/null 2>&1
+}
+
+DATABASE_CREATED=0
+
+if check_database_access; then
+    echo "DATABASE_ALREADY_AVAILABLE"
+else
+    echo "Доступ к БД отсутствует. Синхронизация реквизитов ISPmanager."
+
+    EDIT_OUTPUT="$(
+        /usr/local/mgr5/sbin/mgrctl \
+            -m ispmgr \
+            db.edit \
+            elid="$DATABASE_NAME" \
+            name="$DATABASE_NAME" \
+            owner="$DATABASE_OWNER" \
+            server="MySQL" \
+            charset="utf8mb4" \
+            user="*" \
+            username="$DATABASE_USER" \
+            -e 'password=$DB_PASSWORD' \
+            -e 'confirm=$DB_PASSWORD' \
+            hide_remote_access=on \
+            remote_access=off \
+            sok=ok 2>&1
+    )"
+    EDIT_STATUS=$?
+
+    if [ "$EDIT_STATUS" -eq 0 ]; then
+        echo "DATABASE_CREDENTIALS_UPDATED"
+    else
+        echo "БД не найдена для редактирования. Выполняется создание."
+
+        CREATE_OUTPUT="$(
+            /usr/local/mgr5/sbin/mgrctl \
+                -m ispmgr \
+                db.edit \
+                name="$DATABASE_NAME" \
+                owner="$DATABASE_OWNER" \
+                server="MySQL" \
+                charset="utf8mb4" \
+                user="*" \
+                username="$DATABASE_USER" \
+                -e 'password=$DB_PASSWORD' \
+                -e 'confirm=$DB_PASSWORD' \
+                hide_remote_access=on \
+                remote_access=off \
+                sok=ok 2>&1
+        )"
+        CREATE_STATUS=$?
+
+        if [ "$CREATE_STATUS" -ne 0 ]; then
+            printf '%s\n' "$EDIT_OUTPUT" >&2
+            printf '%s\n' "$CREATE_OUTPUT" >&2
+            echo "ISPmanager не создал и не обновил базу данных." >&2
+            exit "$CREATE_STATUS"
+        fi
+
+        DATABASE_CREATED=1
+        echo "DATABASE_CREATED"
+    fi
+
+    if ! check_database_access; then
+        unset MYSQL_PWD
+        unset DB_PASSWORD
+        DB_PASSWORD=""
+
+        echo "ISPmanager обработал команду, но пароль пользователя MySQL" >&2
+        echo "не совпадает с паролем из config.php." >&2
+        echo "Повторные подключения не выполняются: ERROR 1045 не является ожиданием запуска БД." >&2
+        exit 41
+    fi
+fi
+
+"$DB_CLIENT" \
+    --default-character-set=utf8mb4 \
+    --connect-timeout=10 \
+    --user="$DATABASE_USER" \
+    --database="$DATABASE_NAME" \
+    < "$REMOTE_SQL"
+
+IMPORT_STATUS=$?
+
+unset MYSQL_PWD
+unset DB_PASSWORD
+DB_PASSWORD=""
+
+if [ "$IMPORT_STATUS" -ne 0 ]; then
+    echo "Ошибка импорта SQL. Код: $IMPORT_STATUS" >&2
+    exit "$IMPORT_STATUS"
+fi
+
+echo "SQL_IMPORT_OK"
+exit 0
+""";
+    }
+
+'@
+
+$methodMatches = [regex]::Matches($text, $methodPattern)
+
+if ($methodMatches.Count -ne 1) {
+    throw (
+        'Не удалось однозначно найти CreateRemoteScript. ' +
+        "Совпадений: $($methodMatches.Count)"
+    )
+}
+
+$text = [regex]::Replace(
+    $text,
+    $methodPattern,
+    [System.Text.RegularExpressions.MatchEvaluator] {
+        param($match)
+        return $newMethod
+    },
+    1
+)
+
+# Принудительно преобразуем создаваемый run.sh в Unix LF.
+if (
+    $text -notmatch 'normalizedScriptText' -and
+    $text -notmatch 'scriptText\s*\.Replace\('
+) {
+    $uploadPattern = @'
+(?s)            using \(var scriptStream = new MemoryStream\(\s*new UTF8Encoding\(false\)\.GetBytes\(\s*scriptText\)\)\)\s*\{\s*sftp\.UploadFile\(\s*scriptStream,\s*remoteScript,\s*true\);\s*\}
+'@
+
+    $uploadReplacement = @'
+            var normalizedScriptText = scriptText
+                .Replace(
+                    "\r\n",
+                    "\n",
+                    StringComparison.Ordinal)
+                .Replace(
+                    "\r",
+                    "\n",
+                    StringComparison.Ordinal);
+
+            using (var scriptStream = new MemoryStream(
+                       new UTF8Encoding(false).GetBytes(
+                           normalizedScriptText)))
+            {
+                sftp.UploadFile(
+                    scriptStream,
+                    remoteScript,
+                    true);
+            }
+'@
+
+    $uploadMatches = [regex]::Matches($text, $uploadPattern)
+
+    if ($uploadMatches.Count -ne 1) {
+        throw (
+            'Не удалось найти блок загрузки run.sh. ' +
+            "Совпадений: $($uploadMatches.Count)"
+        )
+    }
+
+    $text = [regex]::Replace(
+        $text,
+        $uploadPattern,
+        [System.Text.RegularExpressions.MatchEvaluator] {
+            param($match)
+            return $uploadReplacement
+        },
+        1
+    )
+}
+
+$utf8Bom = New-Object System.Text.UTF8Encoding($true)
+
+[System.IO.File]::WriteAllText(
+    $dbFile,
+    $text,
+    $utf8Bom
+)
+
+Write-Host 'DatabaseDeploymentService.cs исправлен.' `
+    -ForegroundColor Green
+
+# ------------------------------------------------------------------
+# 2. Алиасы WWW-домена
+# ------------------------------------------------------------------
+
+$ispText = [System.IO.File]::ReadAllText($ispFile)
+
+$oldAlias = 'var aliases = $"*.{domain}";'
+$newAlias = 'var aliases = $"*.{domain} www.{domain}";'
+
+if ($ispText.Contains($oldAlias)) {
+    $ispText = $ispText.Replace($oldAlias, $newAlias)
+
+    [System.IO.File]::WriteAllText(
+        $ispFile,
+        $ispText,
+        $utf8Bom
+    )
+
+    Write-Host 'Алиасы исправлены: *.домен и www.домен.' `
+        -ForegroundColor Green
+}
+elseif ($ispText.Contains($newAlias)) {
+    Write-Host 'Правильные алиасы уже установлены.' `
+        -ForegroundColor Yellow
+}
+else {
+    throw 'Не удалось найти объявление aliases в IspmanagerAutomationService.cs.'
+}
+
+# ------------------------------------------------------------------
+# 3. Контроль исходника
+# ------------------------------------------------------------------
+
+$dbCheck = [System.IO.File]::ReadAllText($dbFile)
+
+$requiredFragments = @(
+    "-e 'password=`$DB_PASSWORD'",
+    "-e 'confirm=`$DB_PASSWORD'",
+    'elid="$DATABASE_NAME"',
+    'DATABASE_CREDENTIALS_UPDATED',
+    'SQL_IMPORT_OK'
+)
+
+foreach ($fragment in $requiredFragments) {
+    if (-not $dbCheck.Contains($fragment)) {
+        throw "После исправления не найден фрагмент: $fragment"
+    }
+}
+
+Write-Host 'Проверка исправленного исходника пройдена.' `
+    -ForegroundColor Green
+
+# ------------------------------------------------------------------
+# 4. Очистка и публикация
+# ------------------------------------------------------------------
+
+$env:DOTNET_ROOT = 'C:\Program Files\dotnet'
+$env:Path = "C:\Program Files\dotnet;$env:Path"
+
+Set-Location -LiteralPath $root
+
+if (Test-Path -LiteralPath $publish) {
+    Remove-Item -LiteralPath $publish -Recurse -Force
+}
+
+Write-Host "`nПроверочная сборка..." -ForegroundColor Cyan
+
+& $dotnet build `
+    $project `
+    -c Release `
+    -r win-x64
+
+if ($LASTEXITCODE -ne 0) {
+    throw "dotnet build завершился с кодом $LASTEXITCODE"
+}
+
+Write-Host "`nПубликация нового EXE..." -ForegroundColor Cyan
+
+& $dotnet publish `
+    $project `
+    -c Release `
+    -r win-x64 `
+    --self-contained true `
+    --output $publish `
+    -p:PublishSingleFile=true `
+    -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:EnableCompressionInSingleFile=true
+
+if ($LASTEXITCODE -ne 0) {
+    throw "dotnet publish завершился с кодом $LASTEXITCODE"
+}
+
+$exe = Join-Path $publish 'TextFileProcessor.exe'
+
+if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+    throw "Новый EXE не найден: $exe"
+}
+
+Write-Host "`nИСПРАВЛЕНИЕ УСТАНОВЛЕНО" -ForegroundColor Green
+Write-Host "EXE: $exe" -ForegroundColor Yellow
+Write-Host "Резервные копии имеют суффикс: backup-$stamp" `
+    -ForegroundColor DarkGray
+
+Start-Process explorer.exe `
+    -ArgumentList "/select,`"$exe`""
+
+После успешного выполнения запускайте только:
+
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\publish\win-x64\TextFileProcessor.exe
+
+Старые BUILD7.ps1 и INSTALL-BUILD6.ps1 повторно не запускайте: они могут вернуть старую реализацию.
+
+Важно: это исправляет текущую ошибку БД и алиасы. Алиас *.domain всё ещё сам по себе не выпускает Wildcard SSL. В репозитории сейчас отсутствуют сервис и настройки Spaceship, поэтому синхронизация _acme-challenge там фактически ещё не реализована.
+
+Резервные копии созданы.
+DatabaseDeploymentService.cs исправлен.
+Правильные алиасы уже установлены.
+Проверка исправленного исходника пройдена.
+
+Проверочная сборка...
+Определение проектов для восстановления...
+Все проекты обновлены для восстановления.
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\DatabaseDeploymentService.cs(391,5): error CS1073
+: Непредвиденный токен "\" [C:\Users\User\Desktop\Adminki\. Программа домены\Нова...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Размышление
+
+
+
+
+
+Причина найдена: в C# использована строка $""", поэтому фигурные скобки shell-функции воспринимаются как C#-интерполяция. Нужно заменить её на `
+You can't use 'macro parameter character #' in math mode
+""" оставляет одиночные { } литеральными для shell.
+𝑟𝑎𝑤𝑆𝑡𝑟𝑖𝑛𝑔𝐶𝑜𝑢𝑛𝑡 =([𝑟𝑒𝑔𝑒𝑥] ::𝑀𝑎𝑡𝑐ℎ𝑒𝑠(method,
+[regex]::Escape('$"""')
+)
+).Count
+
+if (𝑚𝑒𝑡ℎ𝑜𝑑.𝐶𝑜𝑛𝑡𝑎𝑖𝑛𝑠(′𝑟𝑒𝑡𝑢𝑟𝑛′ +[𝐸𝑛𝑣𝑖𝑟𝑜𝑛𝑚𝑒𝑛𝑡] ::𝑁𝑒𝑤𝐿𝑖𝑛𝑒 +′″ ″ ″′) −𝑜𝑟method.Contains("return`n`‵`"`"`"")) {
+    Write-Host 'Строка уже переведена в режим 
+Extra close brace or missing open brace
+"""')) {
+throw 'Конструкция 
+Extra close brace or missing open brace
+"""
+...
+DATABASE_NAME={{ShellQuote(databaseName)}}
+...
+check_database_access()
+{
+...
+}
+""";
+
+
+Теперь одиночные `{` и `}` внутри shell-скрипта являются обычными символами, а двойные `{{...}}` выполняют C#-подстановку.
+
+пришли нормальный код!
+GPT-5.6 Sol
+GPT-5.6 Sol
+Да. Предыдущий вариант был излишне сложным. Запустите этот цельный PowerShell-скрипт — он исправит интерполяцию только внутри CreateRemoteScript, затем соберёт и опубликует EXE.
+
+$ErrorActionPreference = 'Stop'
+
+$root = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$file = Join-Path $root 'Services\DatabaseDeploymentService.cs'
+$project = Join-Path $root 'TextFileProcessor.csproj'
+$publish = Join-Path $root 'publish\win-x64'
+$dotnet = 'C:\Program Files\dotnet\dotnet.exe'
+
+if (-not (Test-Path -LiteralPath $file)) {
+    throw "Не найден файл: $file"
+}
+
+if (-not (Test-Path -LiteralPath $project)) {
+    throw "Не найден проект: $project"
+}
+
+if (-not (Test-Path -LiteralPath $dotnet)) {
+    throw "Не найден dotnet: $dotnet"
+}
+
+# Останавливаем запущенную программу.
+Get-Process -Name TextFileProcessor -ErrorAction SilentlyContinue |
+    Stop-Process -Force
+
+# Резервная копия.
+$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$backup = "$file.backup-$stamp"
+
+Copy-Item -LiteralPath $file -Destination $backup -Force
+
+Write-Host "Резервная копия:" -ForegroundColor Cyan
+Write-Host $backup -ForegroundColor DarkGray
+
+$text = [System.IO.File]::ReadAllText($file)
+
+# Находим только метод CreateRemoteScript.
+$methodPattern = '(?s)(private\s+static\s+string\s+CreateRemoteScript\s*\(.*?)(?=\r?\n\s*private\s+static\s+)'
+$match = [regex]::Match($text, $methodPattern)
+
+if (-not $match.Success) {
+    throw 'Метод CreateRemoteScript не найден.'
+}
+
+$method = $match.Value
+
+# Исправляем начало интерполированной raw-строки:
+# было: $"""
+# стало: $$"""
+#
+# При $$""" одиночные фигурные скобки shell-кода не считаются
+# C#-интерполяцией.
+if ($method.Contains('$$"""')) {
+    Write-Host 'Конструкция $$""" уже установлена.' `
+        -ForegroundColor Yellow
+}
+elseif ($method.Contains('$"""')) {
+    $method = $method.Replace('$"""', '$$"""')
+}
+else {
+    throw 'В CreateRemoteScript не найдена конструкция $""".'
+}
+
+# При $$""" подстановки C# должны иметь двойные скобки:
+# {ShellQuote(value)} -> {{ShellQuote(value)}}
+#
+# Отрицательные проверки не позволяют повторно добавлять скобки.
+$method = [regex]::Replace(
+    $method,
+    '(?<!\{)\{(ShellQuote\([^{}\r\n]+\))\}(?!\})',
+    '{{$1}}'
+)
+
+# Возвращаем исправленный метод в исходник.
+$text = $text.Substring(0, $match.Index) +
+        $method +
+        $text.Substring($match.Index + $match.Length)
+
+# Сохраняем UTF-8 с BOM.
+$encoding = New-Object System.Text.UTF8Encoding($true)
+
+[System.IO.File]::WriteAllText(
+    $file,
+    $text,
+    $encoding
+)
+
+Write-Host 'DatabaseDeploymentService.cs исправлен.' `
+    -ForegroundColor Green
+
+# Показываем проблемную область для контроля.
+Write-Host "`nСтроки 380–405 после исправления:" `
+    -ForegroundColor Cyan
+
+$lines = [System.IO.File]::ReadAllLines($file)
+
+for ($i = 379; $i -lt [Math]::Min(405, $lines.Length); $i++) {
+    Write-Host ('{0,4}: {1}' -f ($i + 1), $lines[$i])
+}
+
+Set-Location -LiteralPath $root
+
+Write-Host "`nПроверочная сборка..." -ForegroundColor Cyan
+
+& $dotnet build `
+    $project `
+    --configuration Release `
+    --runtime win-x64
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "`nСборка не прошла." -ForegroundColor Red
+    Write-Host "Восстановить исходник можно из:" -ForegroundColor Yellow
+    Write-Host $backup
+    exit $LASTEXITCODE
+}
+
+Write-Host "`nСборка прошла успешно." -ForegroundColor Green
+
+# Удаляем предыдущую публикацию только после успешной сборки.
+if (Test-Path -LiteralPath $publish) {
+    Remove-Item -LiteralPath $publish -Recurse -Force
+}
+
+Write-Host "`nПубликация EXE..." -ForegroundColor Cyan
+
+& $dotnet publish `
+    $project `
+    --configuration Release `
+    --runtime win-x64 `
+    --self-contained true `
+    --output $publish `
+    -p:PublishSingleFile=true `
+    -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:EnableCompressionInSingleFile=true
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Публикация завершилась с кодом $LASTEXITCODE"
+}
+
+$exe = Join-Path $publish 'TextFileProcessor.exe'
+
+if (-not (Test-Path -LiteralPath $exe)) {
+    throw "EXE не найден: $exe"
+}
+
+Write-Host "`nГОТОВО" -ForegroundColor Green
+Write-Host $exe -ForegroundColor Yellow
+
+Start-Process explorer.exe -ArgumentList "/select,`"$exe`""
+
+Правильный C# внутри метода должен выглядеть так:
+
+return
+$$"""
+DATABASE_NAME={{ShellQuote(databaseName)}}
+DATABASE_USER={{ShellQuote(databaseUser)}}
+
+check_database_access()
+{
+    echo "Проверка подключения"
+}
+""";
+
+То есть shell-скобки остаются одиночными { }, а C#-подстановки записываются как {{...}}.
+
+05.09.2026 17:48:04 ERROR casino71.cfd Серверная команда завершилась с кодом 41: ISPmanager обработал команду, но пароль пользователя MySQL не совпадает с паролем из config.php. Повторные подключения не выполняются: ERROR 1045 не является ожиданием запуска БД.
+мне кажется ты генирируешь новый пароль а нужно чтоб был один и тот же которые в файле конфиг! Он все время у всех одинаковый! Я так хочу и я знаю что так не безопасно! это тест! ДЕЛАЙ!!!!!
+GPT-5.6 Sol
+GPT-5.6 Sol
+Вы правы: код не должен генерировать новый пароль. Ошибка 41 сейчас появляется потому, что при ERROR 1045 программа прекращает работу вместо установки MySQL-пользователю пароля из config.php.
+
+Нужно сделать так:
+
+Прочитать DB_NAME, DB_USER, DB_PASSWORD, DB_HOST из config.php.
+Создать пользователя, если его нет.
+Всегда установить ему именно DB_PASSWORD из config.php.
+Выдать права.
+Только после этого проверять подключение и импортировать SQL.
+Но без текущего содержимого метода я не буду снова присылать выдуманный патч, который сломает кавычки. Выполните в PowerShell этот код — он сохранит нужный участок в файл и откроет его:
+
+$root = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$source = Join-Path $root 'Services\DatabaseDeploymentService.cs'
+$output = Join-Path $root 'DatabaseDeploymentService-fragment.txt'
+
+if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+    throw "Не найден файл: $source"
+}
+
+$text = [System.IO.File]::ReadAllText($source)
+
+$patterns = @(
+    'CreateRemoteScript',
+    'DATABASE_CREDENTIALS_UPDATED',
+    'ERROR 1045',
+    'кодом 41',
+    'exit 41'
+)
+
+$lines = [System.IO.File]::ReadAllLines($source)
+$indexes = New-Object System.Collections.Generic.List[int]
+
+for ($i = 0; $i -lt $lines.Length; $i++) {
+    foreach ($pattern in $patterns) {
+        if ($lines[$i].IndexOf(
+            $pattern,
+            [System.StringComparison]::OrdinalIgnoreCase
+        ) -ge 0) {
+            $indexes.Add($i)
+            break
+        }
+    }
+}
+
+if ($indexes.Count -eq 0) {
+    throw 'Не найден код обработки базы данных.'
+}
+
+$from = [Math]::Max(0, ($indexes | Measure-Object -Minimum).Minimum - 80)
+$to = [Math]::Min(
+    $lines.Length - 1,
+    ($indexes | Measure-Object -Maximum).Maximum + 120
+)
+
+$result = for ($i = $from; $i -le $to; $i++) {
+    '{0,5}: {1}' -f ($i + 1), $lines[$i]
+}
+
+[System.IO.File]::WriteAllLines(
+    $output,
+    $result,
+    [System.Text.UTF8Encoding]::new($true)
+)
+
+Write-Host "Фрагмент сохранён: $output" -ForegroundColor Green
+Start-Process notepad.exe -ArgumentList "`"$output`""
+
+Пришлите сюда содержимое открывшегося файла. Я верну конкретную полную замену метода, совместимую с вашим исходником.
+
+Правильная логика в серверном скрипте должна быть именно такой:
+
+# Значения должны быть прочитаны из config.php,
+# а не созданы генератором.
+DATABASE_NAME='значение DB_NAME'
+DATABASE_USER='значение DB_USER'
+DATABASE_PASSWORD='значение DB_PASSWORD'
+
+# Для существующего пользователя пароль синхронизируется с config.php.
+mysql_as_admin <<SQL
+CREATE DATABASE IF NOT EXISTS \`${DATABASE_NAME}\`;
+
+CREATE USER IF NOT EXISTS
+    '${DATABASE_USER}'@'localhost'
+    IDENTIFIED BY '${DATABASE_PASSWORD}';
+
+ALTER USER
+    '${DATABASE_USER}'@'localhost'
+    IDENTIFIED BY '${DATABASE_PASSWORD}';
+
+GRANT ALL PRIVILEGES ON \`${DATABASE_NAME}\`.*
+    TO '${DATABASE_USER}'@'localhost';
+
+FLUSH PRIVILEGES;
+SQL
+
+Если подключение идёт также через 127.0.0.1, пароль нужно синхронизировать и для второй учётной записи:
+
+CREATE USER IF NOT EXISTS
+    'USER'@'127.0.0.1'
+    IDENTIFIED BY 'PASSWORD';
+
+ALTER USER
+    'USER'@'127.0.0.1'
+    IDENTIFIED BY 'PASSWORD';
+
+GRANT ALL PRIVILEGES ON `DATABASE`.*
+    TO 'USER'@'127.0.0.1';
+
+Значения нельзя буквально вставлять как в примере: в готовом C#-методе нужно корректно экранировать пароль одновременно для shell и SQL. Поэтому нужен фактический метод CreateRemoteScript, чтобы дать рабочий патч без очередной ошибки сборки.
+
+cvjnhb tuj yf https://github.com/raliya/kdhGHf643tf76.git d afqkt читайфайл1.txt
+GPT-5.6 Sol
+GPT-5.6 Sol
+Навык активирован: page_content
+get_page_content
+Содержимое страницы
+Размышление
+
+
+Прочитал читайфайл1.txt. Ошибка найдена.
+
+Пароль из config.php уже загружается в SECRET_FILE, но в командах ISPmanager переменная заключена в одинарные кавычки:
+
+-e 'password=$DB_PASSWORD'
+-e 'confirm=$DB_PASSWORD'
+
+Из-за этого сервер получает буквальный текст $DB_PASSWORD, а не пароль из файла.
+
+В DatabaseDeploymentService.cs замените в обоих местах строки:
+
+-e 'password=$DB_PASSWORD' \
+-e 'confirm=$DB_PASSWORD' \
+
+на:
+
+-e "password=$DB_PASSWORD" \
+-e "confirm=$DB_PASSWORD" \
+
+Исправленный участок целиком:
+
+    EDIT_OUTPUT="$(
+        /usr/local/mgr5/sbin/mgrctl \
+            -m ispmgr \
+            db.edit \
+            elid="$DATABASE_NAME" \
+            name="$DATABASE_NAME" \
+            owner="$DATABASE_OWNER" \
+            server="MySQL" \
+            charset="utf8mb4" \
+            user="*" \
+            username="$DATABASE_USER" \
+            -e "password=$DB_PASSWORD" \
+            -e "confirm=$DB_PASSWORD" \
+            hide_remote_access=on \
+            remote_access=off \
+            sok=ok 2>&1
+    )"
+
+И второй участок:
+
+        CREATE_OUTPUT="$(
+            /usr/local/mgr5/sbin/mgrctl \
+                -m ispmgr \
+                db.edit \
+                name="$DATABASE_NAME" \
+                owner="$DATABASE_OWNER" \
+                server="MySQL" \
+                charset="utf8mb4" \
+                user="*" \
+                username="$DATABASE_USER" \
+                -e "password=$DB_PASSWORD" \
+                -e "confirm=$DB_PASSWORD" \
+                hide_remote_access=on \
+                remote_access=off \
+                sok=ok 2>&1
+        )"
+
+Можно автоматически исправить из PowerShell:
+
+$root = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$file = Join-Path $root 'Services\DatabaseDeploymentService.cs'
+
+$text = [IO.File]::ReadAllText($file)
+
+$text = $text.Replace(
+    "-e 'password=`$DB_PASSWORD'",
+    '-e "password=$DB_PASSWORD"'
+)
+
+$text = $text.Replace(
+    "-e 'confirm=`$DB_PASSWORD'",
+    '-e "confirm=$DB_PASSWORD"'
+)
+
+[IO.File]::WriteAllText(
+    $file,
+    $text,
+    [Text.UTF8Encoding]::new($true)
+)
+
+Set-Location -LiteralPath $root
+dotnet build .\TextFileProcessor.csproj -c Release
+
+Новый пароль здесь не генерируется. После исправления ISPmanager получит ровно тот пароль, который был прочитан из config.php и загружен в remoteSecret.
+
+05.09.2026 17:54:04 ERROR casino71.cfd Серверная команда завершилась с кодом 41: ISPmanager обработал команду, но пароль пользователя MySQL не совпадает с паролем из config.php. Повторные подключения не выполняются: ERROR 1045 не является ожиданием запуска БД.
+GPT-5.6 Sol
+GPT-5.6 Sol
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+Навык активирован: web_search
+get_serp
+Поисковая выдача
+Результаты (9)
+get_page_content
+Содержимое страницы
+get_serp
+Поисковая выдача
+Результаты (10)
+get_page_content
+Содержимое страницы
+get_serp
+Поисковая выдача
+Результаты (3)
+Размышление
+
+
+Причина найдена: мой прошлый совет про двойные кавычки был неправильным. Для ключа mgrctl -e нужны именно одинарные кавычки — тогда mgrctl получает имя переменной окружения и сам читает секрет:
+
+-e 'password=$DB_PASSWORD'
+
+Проблема в другом: db.edit редактирует базу, но не гарантирует смену пароля уже существующего пользователя MySQL. Поэтому команда завершается успешно, однако старый пароль пользователя остаётся.
+
+Замените метод CreateRemoteScript целиком на этот:
+
+private static string CreateRemoteScript(
+    string databaseName,
+    string databaseUser,
+    string owner,
+    string remoteSql,
+    string remoteSecret)
+{
+    return
+$$"""
+#!/bin/sh
+set -u
+
+DATABASE_NAME={{ShellQuote(databaseName)}}
+DATABASE_USER={{ShellQuote(databaseUser)}}
+DATABASE_OWNER={{ShellQuote(owner)}}
+REMOTE_SQL={{ShellQuote(remoteSql)}}
+SECRET_FILE={{ShellQuote(remoteSecret)}}
+MGRCTL="/usr/local/mgr5/sbin/mgrctl"
+
+if [ ! -f "$REMOTE_SQL" ]; then
+    echo "SQL-файл не найден." >&2
+    exit 31
+fi
+
+if [ ! -f "$SECRET_FILE" ]; then
+    echo "Файл с паролем БД не найден." >&2
+    exit 32
+fi
+
+DB_PASSWORD="$(cat -- "$SECRET_FILE")"
+
+if [ -z "$DB_PASSWORD" ]; then
+    echo "Пароль базы данных пуст." >&2
+    exit 33
+fi
+
+export MYSQL_PWD="$DB_PASSWORD"
+export DB_PASSWORD
+
+if command -v mariadb >/dev/null 2>&1; then
+    DB_CLIENT="mariadb"
+elif command -v mysql >/dev/null 2>&1; then
+    DB_CLIENT="mysql"
+else
+    echo "Не найден клиент mariadb или mysql." >&2
+    exit 34
+fi
+
+check_database_access()
+{
+    "$DB_CLIENT" \
+        --protocol=socket \
+        --connect-timeout=10 \
+        --user="$DATABASE_USER" \
+        --database="$DATABASE_NAME" \
+        --execute="SELECT 1" \
+        >/dev/null 2>&1
+}
+
+DATABASE_CREATED=0
+
+if check_database_access; then
+    echo "DATABASE_ALREADY_AVAILABLE"
+else
+    echo "Синхронизация базы и пользователя с config.php."
+
+    EDIT_OUTPUT="$(
+        "$MGRCTL" \
+            -m ispmgr \
+            db.edit \
+            elid="$DATABASE_NAME" \
+            name="$DATABASE_NAME" \
+            owner="$DATABASE_OWNER" \
+            server="MySQL" \
+            charset="utf8mb4" \
+            user="*" \
+            username="$DATABASE_USER" \
+            -e 'password=$DB_PASSWORD' \
+            -e 'confirm=$DB_PASSWORD' \
+            hide_remote_access=on \
+            remote_access=off \
+            sok=ok 2>&1
+    )"
+    EDIT_STATUS=$?
+
+    if [ "$EDIT_STATUS" -ne 0 ]; then
+        CREATE_OUTPUT="$(
+            "$MGRCTL" \
+                -m ispmgr \
+                db.edit \
+                name="$DATABASE_NAME" \
+                owner="$DATABASE_OWNER" \
+                server="MySQL" \
+                charset="utf8mb4" \
+                user="*" \
+                username="$DATABASE_USER" \
+                -e 'password=$DB_PASSWORD' \
+                -e 'confirm=$DB_PASSWORD' \
+                hide_remote_access=on \
+                remote_access=off \
+                sok=ok 2>&1
+        )"
+        CREATE_STATUS=$?
+
+        if [ "$CREATE_STATUS" -ne 0 ]; then
+            printf '%s\n' "$EDIT_OUTPUT" >&2
+            printf '%s\n' "$CREATE_OUTPUT" >&2
+            echo "ISPmanager не создал и не обновил базу данных." >&2
+            exit "$CREATE_STATUS"
+        fi
+
+        DATABASE_CREATED=1
+        echo "DATABASE_CREATED"
+    fi
+
+    # db.edit может не менять пароль уже существующего пользователя.
+    # Поэтому отдельно вызываем форму редактирования пользователя БД.
+    USER_EDIT_OUTPUT="$(
+        "$MGRCTL" \
+            -m ispmgr \
+            db.user.edit \
+            elid="$DATABASE_USER" \
+            plid="$DATABASE_NAME" \
+            name="$DATABASE_USER" \
+            username="$DATABASE_USER" \
+            -e 'password=$DB_PASSWORD' \
+            -e 'confirm=$DB_PASSWORD' \
+            sok=ok 2>&1
+    )"
+    USER_EDIT_STATUS=$?
+
+    if [ "$USER_EDIT_STATUS" -ne 0 ]; then
+        printf '%s\n' "$USER_EDIT_OUTPUT" >&2
+        echo "ISPmanager не смог установить пользователю БД пароль из config.php." >&2
+        exit 42
+    fi
+
+    echo "DATABASE_USER_PASSWORD_UPDATED"
+
+    # На применение изменений даём до 20 секунд.
+    ACCESS_READY=0
+    ATTEMPT=0
+
+    while [ "$ATTEMPT" -lt 10 ]; do
+        if check_database_access; then
+            ACCESS_READY=1
+            break
+        fi
+
+        ATTEMPT=$((ATTEMPT + 1))
+        sleep 2
+    done
+
+    if [ "$ACCESS_READY" -ne 1 ]; then
+        unset MYSQL_PWD
+        unset DB_PASSWORD
+        DB_PASSWORD=""
+
+        echo "ISPmanager принял изменение пользователя, но MySQL отклонил пароль." >&2
+        echo "Проверьте имя функции и параметры командой:" >&2
+        echo "$MGRCTL -m ispmgr -i db.user.edit lang=ru" >&2
+        exit 41
+    fi
+fi
+
+"$DB_CLIENT" \
+    --protocol=socket \
+    --default-character-set=utf8mb4 \
+    --connect-timeout=10 \
+    --user="$DATABASE_USER" \
+    --database="$DATABASE_NAME" \
+    < "$REMOTE_SQL"
+
+IMPORT_STATUS=$?
+
+unset MYSQL_PWD
+unset DB_PASSWORD
+DB_PASSWORD=""
+
+if [ "$IMPORT_STATUS" -ne 0 ]; then
+    echo "Ошибка импорта SQL. Код: $IMPORT_STATUS" >&2
+    exit "$IMPORT_STATUS"
+fi
+
+echo "SQL_IMPORT_OK"
+exit 0
+""";
+}
+
+Важно: строки должны остаться именно такими:
+
+-e 'password=$DB_PASSWORD'
+-e 'confirm=$DB_PASSWORD'
+
+Это специальный синтаксис mgrctl, а не обычная shell-подстановка.
+
+После замены обязательно пересоберите и запускайте новый, а не старый EXE:
+
+$root = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$project = Join-Path $root 'TextFileProcessor.csproj'
+$publish = Join-Path $root 'publish\win-x64'
+
+Get-Process TextFileProcessor -ErrorAction SilentlyContinue |
+    Stop-Process -Force
+
+Remove-Item $publish -Recurse -Force -ErrorAction SilentlyContinue
+
+dotnet publish $project `
+    -c Release `
+    -r win-x64 `
+    --self-contained true `
+    -o $publish `
+    -p:PublishSingleFile=true `
+    -p:IncludeNativeLibrariesForSelfExtract=true
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Сборка завершилась с ошибкой."
+}
+
+$exe = Join-Path $publish 'TextFileProcessor.exe'
+Start-Process $exe
+
+Если сервер вернёт код 42, значит в установленной версии ISPmanager функция или поля пользователя называются иначе. Точные параметры на конкретном сервере покажет:
+
+/usr/local/mgr5/sbin/mgrctl -m ispmgr -i db.user.edit lang=ru
+
+Документация ISPmanager отдельно предупреждает, что точные функции и параметры зависят от конфигурации панели.
+
+строка:9 знак:3
++ $$"""
++ ~~~
+Непредвиденная лексема """"
+#!/bin/sh
+set -u
+DATABASE_NAME={{ShellQuote(databaseName)}}
+DATABASE_USER={{ShellQuote(databaseUser)}}
+DATABASE_OWNER={{ShellQuote(owner)}}
+REMOTE_SQL={{ShellQuote(remoteSql)}}
+SECRET_FILE={{ShellQuote(remoteSecret)}}
+MGRCTL="" в выражении или операторе.
+строка:18 знак:10
++ MGRCTL="/usr/local/mgr5/sbin/mgrctl"
++ ~
+Необходимо ...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Размышление
+
+
+Извините. Вы вставили C#-метод прямо в PowerShell, поэтому PowerShell пытается выполнить `
+You can't use 'macro parameter character #' in math mode
+"""
+
+
+является синтаксисом C#, а не PowerShell.
+
+Сохраните файл и закройте Блокнот.
+
+### 3. Соберите программу в PowerShell
+
+Только после сохранения выполните:
+
+```powershell
+$root = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$project = Join-Path $root 'TextFileProcessor.csproj'
+$publish = Join-Path $root 'publish\win-x64'
+
+Get-Process 'TextFileProcessor' -ErrorAction SilentlyContinue |
+    Stop-Process -Force
+
+Remove-Item $publish -Recurse -Force -ErrorAction SilentlyContinue
+
+dotnet publish $project `
+    -c Release `
+    -r win-x64 `
+    --self-contained true `
+    -o $publish `
+    -p:PublishSingleFile=true `
+    -p:IncludeNativeLibrariesForSelfExtract=true
+
+if ($LASTEXITCODE -ne 0) {
+    throw 'Не удалось собрать программу.'
+}
+
+$exe = Join-Path $publish 'TextFileProcessor.exe'
+
+if (-not (Test-Path $exe)) {
+    throw "EXE не создан: $exe"
+}
+
+Start-Process -FilePath $exe
+
+Не вставляйте метод CreateRemoteScript в окно PS C:\...>. В PowerShell вставляется только последний блок со сборкой. Сам метод вставляется внутрь исходного файла .cs.
+
+ПРИШЛИ ЕЩЕ ПАЗ ПРАВИЛЬНЫЙ КОД
+GPT-5.6 Sol
+GPT-5.6 Sol
+Размышление
+
+
+Вот правильный PowerShell-код для сборки и запуска программы. Вставьте его целиком в окно PowerShell:
+
+$root = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$project = Join-Path $root 'TextFileProcessor.csproj'
+$publish = Join-Path $root 'publish\win-x64'
+
+# Останавливаем ранее запущенную программу
+Get-Process 'TextFileProcessor' -ErrorAction SilentlyContinue |
+    Stop-Process -Force
+
+# Удаляем предыдущую сборку
+Remove-Item $publish -Recurse -Force -ErrorAction SilentlyContinue
+
+# Создаём новую сборку
+dotnet publish $project `
+    -c Release `
+    -r win-x64 `
+    --self-contained true `
+    -o $publish `
+    -p:PublishSingleFile=true `
+    -p:IncludeNativeLibrariesForSelfExtract=true
+
+if ($LASTEXITCODE -ne 0) {
+    throw 'Не удалось собрать программу.'
+}
+
+$exe = Join-Path $publish 'TextFileProcessor.exe'
+
+if (-not (Test-Path $exe)) {
+    throw "EXE-файл не создан: $exe"
+}
+
+# Запускаем программу
+Start-Process -FilePath $exe
+
+Готовый EXE-файл появится здесь:
+
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\publish\win-x64\TextFileProcessor.exe
+
+Метод C# CreateRemoteScript в PowerShell вставлять нельзя — он должен находиться внутри исходного файла .cs.
+
+че за новая ошибка!
+05.09.2026 18:05:31 ERROR Каталог домена отсутствует на сервере: /var/www/www-root/data/www/casino71.cfd. Сначала создайте WWW-домен в ISPmanager.
+
+домен находился и закачивались файлы! Верни как было!
+
+БД все так же не создается!!!!!!
+05.09.2026 18:06:18 ERROR casino71.cfd Серверная команда завершилась с кодом 1: Type: 'The environment variable name for the 'password' parameter is invalid.' Type: 'The environment variable name for...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Да, это две регрессии в серверном скрипте.
+
+1. Вернуть загрузку в существующий каталог
+Удалите добавленную проверку, которая завершает работу сообщением:
+
+Каталог домена отсутствует на сервере...
+
+То есть уберите блок вида:
+
+if [ ! -d "$DOMAIN_DIR" ]; then
+    echo "Каталог домена отсутствует на сервере: $DOMAIN_DIR..."
+    exit 1
+fi
+
+Верните прежнее поведение:
+
+mkdir -p "$DOMAIN_DIR"
+
+Если каталог уже существует, команда ничего не изменит. Если отсутствует — создаст его, и загрузка продолжится.
+
+2. Исправить создание БД в ISPmanager
+Ошибка:
+
+The environment variable name for the 'password' parameter is invalid.
+
+означает, что mgrctl получил пароль в неправильном формате. Для параметра password ISPmanager ожидает имя экспортированной переменной окружения, начинающееся с $, а оболочка не должна подставить её заранее.
+
+Используйте такой вызов:
+
+ISP_DB_PASSWORD="$DB_PASSWORD" \
+/usr/local/mgr5/sbin/mgrctl -m ispmgr db.edit \
+    name="$DB_NAME" \
+    username="$DB_USER" \
+    owner="$ISP_USER" \
+    'password=$ISP_DB_PASSWORD' \
+    sok=ok
+
+Критически важна именно эта запись:
+
+'password=$ISP_DB_PASSWORD'
+
+Не должно быть:
+
+password="$DB_PASSWORD"
+password=$DB_PASSWORD
+password='${DB_PASSWORD}'
+password='$DB_PASSWORD'
+
+Переменная, указанная после $ в параметре password, должна реально находиться в окружении процесса mgrctl.
+
+Надёжный полный вариант:
+
+MGRCTL="/usr/local/mgr5/sbin/mgrctl"
+
+if [ ! -x "$MGRCTL" ]; then
+    echo "ISPmanager mgrctl не найден: $MGRCTL" >&2
+    exit 1
+fi
+
+ISP_DB_PASSWORD="$DB_PASSWORD" \
+"$MGRCTL" -m ispmgr db.edit \
+    name="$DB_NAME"
+
+Продолжить
+GPT-5.6 Sol
+GPT-5.6 Sol
+Продолжение полного варианта:
+
+MGRCTL="/usr/local/mgr5/sbin/mgrctl"
+
+if [ ! -x "$MGRCTL" ]; then
+    echo "ISPmanager mgrctl не найден: $MGRCTL" >&2
+    exit 1
+fi
+
+if [ -z "${DB_NAME:-}" ] || \
+   [ -z "${DB_USER:-}" ] || \
+   [ -z "${ISP_USER:-}" ] || \
+   [ -z "${DB_PASSWORD:-}" ]; then
+    echo "Не заданы DB_NAME, DB_USER, ISP_USER или DB_PASSWORD" >&2
+    exit 1
+fi
+
+if ! ISP_DB_PASSWORD="$DB_PASSWORD" \
+    "$MGRCTL" -m ispmgr db.edit \
+        name="$DB_NAME" \
+        username="$DB_USER" \
+        owner="$ISP_USER" \
+        'password=$ISP_DB_PASSWORD' \
+        sok=ok
+then
+    echo "Не удалось создать или изменить базу данных в ISPmanager" >&2
+    exit 1
+fi
+
+echo "Операция с базой данных успешно выполнена"
+
+Если db.edit предназначен только для изменения существующей записи, а нужно именно создать базу, используйте db.edit с параметром elid=0 либо предварительно проверьте поведение вашей версии ISPmanager:
+
+ISP_DB_PASSWORD="$DB_PASSWORD" \
+"$MGRCTL" -m ispmgr db.edit \
+    elid=0 \
+    name="$DB_NAME" \
+    username="$DB_USER" \
+    owner="$ISP_USER" \
+    'password=$ISP_DB_PASSWORD' \
+    sok=ok
+
+Для диагностики можно вывести ответ mgrctl, не раскрывая пароль:
+
+result=$(
+    ISP_DB_PASSWORD="$DB_PASSWORD" \
+    "$MGRCTL" -m ispmgr db.edit \
+        name="$DB_NAME" \
+        username="$DB_USER" \
+        owner="$ISP_USER" \
+        'password=$ISP_DB_PASSWORD' \
+        sok=ok 2>&1
+)
+status=$?
+
+printf '%s\n' "$result"
+
+if [ "$status" -ne 0 ]; then
+    echo "mgrctl завершился с кодом $status" >&2
+    exit "$status"
+fi
+
+Обратите внимание: запуск с set -x может раскрыть значения переменных в журнале. Перед командой с паролем трассировку лучше отключить:
+
+set +x
+ISP_DB_PASSWORD="$DB_PASSWORD" \
+"$MGRCTL" -m ispmgr db.edit \
+    name="$DB_NAME" \
+    username="$DB_USER" \
+    owner="$ISP_USER" \
+    'password=$ISP_DB_PASSWORD' \
+    sok=ok
+
+Если ошибка Password shall begin with $ сохраняется, проверьте, что оболочка действительно передаёт буквальную строку:
+
+printf '<%s>\n' 'password=$ISP_DB_PASSWORD'
+
+Ожидаемый вывод:
+
+<password=$ISP_DB_PASSWORD>
+
+пришли одним блоком правильную команду!
+GPT-5.6 Sol
+GPT-5.6 Sol
+Размышление
+
+
+ISP_DB_PASSWORD="$DB_PASSWORD" "$MGRCTL" -m ispmgr db.edit name="$DB_NAME" username="$DB_USER" owner="$ISP_USER" 'password=$ISP_DB_PASSWORD' sok=ok
+
+ПРИШЛИ НОРМАЛЬГУЮ КОМАНДУ!
+GPT-5.6 Sol
+GPT-5.6 Sol
+export ISP_DB_PASSWORD="$DB_PASSWORD"; "$MGRCTL" -m ispmgr db.edit name="$DB_NAME" username="$DB_USER" owner="$ISP_USER" password=\$ISP_DB_PASSWORD sok=ok
+
+>> Start-Process -FilePath $exe
+>>
+Определение проектов для восстановления...
+Все проекты обновлены для восстановления.
+TextFileProcessor -> C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\bin\Release\net8.0-windows\win-x64\
+TextFileProcessor.dll
+TextFileProcessor -> C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\publish\win-x64\
+PS C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка> ISP_DB_PASSWORD="...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Вы запускаете Linux-команду в Windows PowerShell. Выполните её на сервере ISPmanager через SSH, заменив значения в угловых скобках:
+
+ssh root@<IP_СЕРВЕРА> "/usr/local/mgr5/sbin/mgrctl -m ispmgr db.edit elid=0 name='<ИМЯ_БАЗЫ>' username='<ПОЛЬЗОВАТЕЛЬ_БД>' owner='<ПОЛЬЗОВАТЕЛЬ_ISPMANAGER>' password='<ПАРОЛЬ_БД>' sok=ok"
