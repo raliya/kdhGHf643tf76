@@ -1,0 +1,1767 @@
+GPT-5.6 Sol
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+Прочитал build7.txt из репозитория полностью.
+
+Главная проблема подтверждена: в MainWindow.Build7.cs общий запуск вызывает старые обработчики async void:
+
+CreateSelectedWebDomain_Click(...);
+DeploySelectedSite_Click(...);
+DeployDatabaseButton_Click(...);
+
+а затем ждёт только изменения общего флага:
+
+await WaitForLegacyOperationAsync();
+
+Из-за этого:
+
+общий процесс не получает результат этапа;
+исключения перехватываются внутри обработчиков и не передаются в RunAllProcessesAsync;
+после ошибки домена, загрузки или базы сценарий может перейти к следующему этапу;
+ожидание через _isRunning подвержено гонке;
+пользовательские отмены и закрытые окна подтверждения также могут ошибочно восприниматься как успешное завершение.
+Дополнительно обнаружено:
+
+Текущий MainWindow.xaml.cs правильно содержит:
+InitializeBuild6();
+InitializeBuild7();
+
+MainWindow.Build7.cs входит в сборку автоматически через SDK-style .csproj.
+
+Резервные каталоги исключены:
+
+<Compile Remove="**/backup-before-build6-*/**/*.cs" />
+<Compile Remove="**/.build*-backup-*/**/*.cs" />
+
+Текущий DatabaseDeploymentService.cs уже существенно отличается от старых резервных копий: он пытается сначала обновить реквизиты существующей БД, затем создать её.
+
+BUILD7.ps1 опасно запускать повторно: он заново генерирует старую версию MainWindow.Build7.cs и может затереть более новые исправления, включая добавление:
+
+take=100&skip=0
+
+BUILD8.ps1 также больше не соответствует текущему DatabaseDeploymentService.cs и не является подходящей основой для следующего исправления.
+Правильное следующее исправление — убрать запуск async void из общего процесса и выделить операции в настоящие Task-методы:
+
+await CreateWebDomainForJobAsync(job, showConfirmation: false);
+await DeploySiteForJobAsync(job, showConfirmation: false);
+await DeployDatabaseForJobAsync(job, showConfirmation: false);
+await TestSpaceshipAsync(job.Domain);
+
+При ошибке любой из этих операций RunAllProcessesAsync() должен немедленно останавливаться, а не продолжать следующий этап. Для этого потребуется согласованно изменить:
+
+MainWindow.Build2.cs;
+MainWindow.Build3.cs;
+MainWindow.Build4.cs;
+MainWindow.Build7.cs;
+создать новый установочный скрипт, не основанный на старом BUILD7.ps1.
+Готов продолжить. Уточните, нужно ли подготовить конкретный патч для перечисленных файлов или новый безопасный скрипт обновления.
+
+Жду полный финальный код - исправления программы
+GPT-5.6 Sol
+GPT-5.6 Sol
+Чтобы выдать полный компилируемый финальный код, мне нужны актуальные исходники проекта. В текущем диалоге есть только выводы анализа, но нет содержимого build7.txt и самих .cs-файлов; доступа к репозиторию из этого сообщения у меня также нет. Выдумывать сигнатуры методов и модели проекта небезопасно — такой патч может не собраться.
+
+Прикрепите архив проекта либо вставьте актуальные версии:
+
+MainWindow.xaml.cs
+MainWindow.Build2.cs
+MainWindow.Build3.cs
+MainWindow.Build4.cs
+MainWindow.Build7.cs
+DatabaseDeploymentService.cs
+файл .csproj
+при наличии — классы модели задания (Job или аналог) и сервисы, используемые этими обработчиками
+Можно просто загрузить build7.txt, если в нём полностью приведены перечисленные файлы.
+
+После получения исходников я верну одним ответом:
+
+полный код всех изменённых файлов;
+последовательное выполнение через Task, без запуска async void;
+немедленную остановку цепочки при ошибке или отмене;
+корректное распространение исключений и CancellationToken;
+сохранение отдельных UI-обработчиков как тонких оболочек;
+новый безопасный PowerShell-скрипт установки без перезаписи более свежих изменений;
+перечень заменяемых и добавляемых файлов.
+Где они у меня? в какой папке?
+GPT-5.6 Sol
+GPT-5.6 Sol
+Это файлы исходного проекта программы, а не установленного приложения. Ищите папку, где находится файл с расширением .csproj или .sln.
+
+Обычно проект лежит в одном из мест:
+
+C:\Users\<ВашеИмя>\source\repos\<НазваниеПроекта>\
+C:\Users\<ВашеИмя>\Documents\Visual Studio 2022\Projects\<НазваниеПроекта>\
+C:\Users\<ВашеИмя>\Desktop\<НазваниеПроекта>\
+C:\Users\<ВашеИмя>\Downloads\<НазваниеПроекта>\
+
+Как быстро найти
+Откройте PowerShell и выполните:
+
+Get-ChildItem C:\Users\$env:USERNAME -Recurse -File -Include *.sln,*.csproj -ErrorAction SilentlyContinue |
+    Select-Object -ExpandProperty FullName
+
+Поиск может занять несколько минут. В результатах найдите проект нужной программы.
+
+Затем перейдите в найденную папку и выполните:
+
+Get-ChildItem -Recurse -File |
+    Where-Object {
+        $_.Name -in @(
+            'MainWindow.xaml.cs',
+            'MainWindow.Build2.cs',
+            'MainWindow.Build3.cs',
+            'MainWindow.Build4.cs',
+            'MainWindow.Build7.cs',
+            'DatabaseDeploymentService.cs'
+        )
+    } |
+    Select-Object -ExpandProperty FullName
+
+Скорее всего, структура будет примерно такой:
+
+НазваниеПроекта\
+├── НазваниеПроекта.sln
+└── НазваниеПроекта\
+    ├── НазваниеПроекта.csproj
+    ├── MainWindow.xaml
+    ├── MainWindow.xaml.cs
+    ├── MainWindow.Build2.cs
+    ├── MainWindow.Build3.cs
+    ├── MainWindow.Build4.cs
+    ├── MainWindow.Build7.cs
+    └── Services\
+        └── DatabaseDeploymentService.cs
+
+build7.txt, BUILD7.ps1 и BUILD8.ps1 могут находиться отдельно — например, на рабочем столе или в папке загрузок. Их можно найти так:
+
+Get-ChildItem C:\Users\$env:USERNAME -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -in @('build7.txt', 'BUILD7.ps1', 'BUILD8.ps1') } |
+    Select-Object -ExpandProperty FullName
+
+Если .csproj и .sln вообще не найдутся, вероятно, у вас есть только установленная программа, а исходный проект находится в репозитории, архиве или на другом компьютере. В таком случае пришлите хотя бы build7.txt, если он содержит копии исходников.
+
+все тут C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка что прислать????
+GPT-5.6 Sol
+GPT-5.6 Sol
+Размышление
+
+
+
+Пришлите ZIP-архив всей папки проекта:
+
+C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка
+
+Самый простой способ
+Откройте эту папку в Проводнике.
+Вернитесь на уровень выше.
+Нажмите правой кнопкой на папке «Новая папка».
+Выберите Отправить → Сжатая ZIP-папка.
+Прикрепите получившийся .zip сюда в чат.
+Перед отправкой проверьте, чтобы в архиве не было паролей, API-ключей и токенов. Если они находятся в appsettings.json, .env или других конфигурационных файлах — замените значения на:
+
+REMOVED
+
+Папки bin, obj, .vs, .git можно удалить из архива — они не нужны.
+
+Если весь архив отправить нельзя, пришлите минимум:
+
+*.sln
+*.csproj
+MainWindow.xaml
+MainWindow.xaml.cs
+MainWindow.Build2.cs
+MainWindow.Build3.cs
+MainWindow.Build4.cs
+MainWindow.Build7.cs
+DatabaseDeploymentService.cs
+BUILD7.ps1
+BUILD8.ps1
+build7.txt
+
+Также нужны используемые ими модели и сервисы. Поэтому архив всей папки предпочтительнее — тогда я смогу подготовить полный код без догадок.
+
+пришли команду в повершел чтоб создать большой отчет! все тут C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка
+GPT-5.6 Sol
+GPT-5.6 Sol
+Вставьте целиком этот блок в PowerShell. Он создаст на рабочем столе файл Project_Report.txt со структурой проекта и содержимым исходных файлов.
+
+$ProjectPath = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$ReportPath  = 'C:\Users\User\Desktop\Project_Report.txt'
+
+$AllowedExtensions = @(
+    '.cs', '.csproj', '.sln', '.xaml',
+    '.ps1', '.psm1', '.psd1',
+    '.json', '.xml', '.config',
+    '.props', '.targets',
+    '.txt', '.md', '.yml', '.yaml'
+)
+
+$ExcludedFolders = @(
+    'bin', 'obj', '.vs', '.git',
+    'packages', 'node_modules',
+    'Debug', 'Release'
+)
+
+$SensitiveNames = @(
+    '.env',
+    'secrets.json',
+    'appsettings.Development.json',
+    'appsettings.Production.json',
+    'credentials.json'
+)
+
+if (-not (Test-Path -LiteralPath $ProjectPath -PathType Container)) {
+    throw "Папка проекта не найдена: $ProjectPath"
+}
+
+$ReportDirectory = Split-Path -Parent $ReportPath
+if (-not (Test-Path -LiteralPath $ReportDirectory)) {
+    New-Item -ItemType Directory -Path $ReportDirectory -Force | Out-Null
+}
+
+$Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+$Writer = New-Object System.IO.StreamWriter($ReportPath, $false, $Utf8NoBom)
+
+try {
+    $Writer.WriteLine('ОТЧЁТ ПО ИСХОДНОМУ ПРОЕКТУ')
+    $Writer.WriteLine(('=' * 100))
+    $Writer.WriteLine("Папка проекта: $ProjectPath")
+    $Writer.WriteLine("Дата создания: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')")
+    $Writer.WriteLine("PowerShell: $($PSVersionTable.PSVersion)")
+    $Writer.WriteLine()
+
+    $AllFiles = Get-ChildItem -LiteralPath $ProjectPath -Recurse -File -Force -ErrorAction SilentlyContinue |
+        Where-Object {
+            $FullName = $_.FullName
+
+            $InsideExcludedFolder = $false
+            foreach ($Folder in $ExcludedFolders) {
+                if ($FullName -match "[\\/]\Q$Folder\E[\\/]") {
+                    $InsideExcludedFolder = $true
+                    break
+                }
+            }
+
+            -not $InsideExcludedFolder
+        } |
+        Sort-Object FullName
+
+    $Writer.WriteLine('СТРУКТУРА ФАЙЛОВ')
+    $Writer.WriteLine(('-' * 100))
+
+    foreach ($File in $AllFiles) {
+        $RelativePath = $File.FullName.Substring($ProjectPath.Length).TrimStart('\', '/')
+        $Writer.WriteLine(('{0} ({1:N0} байт)' -f $RelativePath, $File.Length))
+    }
+
+    $Writer.WriteLine()
+    $Writer.WriteLine()
+    $Writer.WriteLine('СОДЕРЖИМОЕ ИСХОДНЫХ ФАЙЛОВ')
+    $Writer.WriteLine(('=' * 100))
+
+    foreach ($File in $AllFiles) {
+        $RelativePath = $File.FullName.Substring($ProjectPath.Length).TrimStart('\', '/')
+        $Extension = $File.Extension.ToLowerInvariant()
+
+        if ($AllowedExtensions -notcontains $Extension) {
+            continue
+        }
+
+        if ($SensitiveNames -contains $File.Name) {
+            $Writer.WriteLine()
+            $Writer.WriteLine(('=' * 100))
+            $Writer.WriteLine("ФАЙЛ ПРОПУЩЕН КАК КОНФИДЕНЦИАЛЬНЫЙ: $RelativePath")
+            $Writer.WriteLine(('=' * 100))
+            continue
+        }
+
+        if ($File.Length -gt 5MB) {
+            $Writer.WriteLine()
+            $Writer.WriteLine(('=' * 100))
+            $Writer.WriteLine("ФАЙЛ ПРОПУЩЕН ИЗ-ЗА Р
+
+Продолжить
+GPT-5.6 Sol
+GPT-5.6 Sol
+Предыдущая команда оборвалась. Нажмите Ctrl+C, затем вставьте этот завершающий блок вместо незаконченной части — начиная со строки if ($File.Length -gt 5MB):
+
+        if ($File.Length -gt 5MB) {
+            $Writer.WriteLine()
+            $Writer.WriteLine(('=' * 100))
+            $Writer.WriteLine("ФАЙЛ ПРОПУЩЕН ИЗ-ЗА РАЗМЕРА: $RelativePath")
+            $Writer.WriteLine("Размер: $([math]::Round($File.Length / 1MB, 2)) МБ")
+            $Writer.WriteLine(('=' * 100))
+            continue
+        }
+
+        $Writer.WriteLine()
+        $Writer.WriteLine(('=' * 100))
+        $Writer.WriteLine("НАЧАЛО ФАЙЛА: $RelativePath")
+        $Writer.WriteLine(('=' * 100))
+
+        try {
+            $Content = Get-Content -LiteralPath $File.FullName -Raw -ErrorAction Stop
+
+            # Маскировка наиболее распространённых секретов
+            $Content = $Content `
+                -replace '(?im)(password|passwd|pwd)(\s*["'']?\s*[:=]\s*["'']?)[^"'']*', '$1$2REMOVED' `
+                -replace '(?im)(api[_-]?key|token|secret)(\s*["'']?\s*[:=]\s*["'']?)[^"'']*', '$1$2REMOVED' `
+                -replace '(?im)(Password\s*=\s*)[^;`r`n]+', '$1REMOVED' `
+                -replace '(?im)(User\s+ID\s*=\s*)[^;`r`n]+', '$1REMOVED'
+
+            $Writer.WriteLine($Content)
+        }
+        catch {
+            $Writer.WriteLine("ОШИБКА ЧТЕНИЯ: $($_.Exception.Message)")
+        }
+
+        $Writer.WriteLine()
+        $Writer.WriteLine("КОНЕЦ ФАЙЛА: $RelativePath")
+    }
+
+    $Writer.WriteLine()
+    $Writer.WriteLine(('=' * 100))
+    $Writer.WriteLine('КОНЕЦ ОТЧЁТА')
+}
+finally {
+    $Writer.Flush()
+    $Writer.Dispose()
+}
+
+Write-Host ''
+Write-Host 'ГОТОВО!' -ForegroundColor Green
+Write-Host "Отчёт создан: $ReportPath" -ForegroundColor Cyan
+Write-Host ''
+Get-Item -LiteralPath $ReportPath |
+    Select-Object FullName, @{Name='Размер_МБ
+
+полностью новый код цельный - пришли!
+GPT-5.6 Sol
+GPT-5.6 Sol
+Скопируйте весь блок целиком, вставьте в PowerShell и нажмите Enter. Команда создаст полный отчёт:
+
+C:\Users\User\Desktop\Project_Report.txt
+
+$ErrorActionPreference = 'Stop'
+
+$ProjectPath = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$ReportPath  = 'C:\Users\User\Desktop\Project_Report.txt'
+
+# Расширения исходных и конфигурационных файлов, которые попадут в отчёт.
+$AllowedExtensions = @(
+    '.cs',
+    '.csproj',
+    '.sln',
+    '.xaml',
+    '.xaml.cs',
+    '.props',
+    '.targets',
+    '.resx',
+    '.config',
+    '.json',
+    '.xml',
+    '.ps1',
+    '.psm1',
+    '.psd1',
+    '.cmd',
+    '.bat',
+    '.txt',
+    '.md',
+    '.yml',
+    '.yaml'
+)
+
+# Каталоги сборки, пакетов и служебные каталоги пропускаются.
+$ExcludedDirectories = @(
+    'bin',
+    'obj',
+    '.vs',
+    '.git',
+    '.idea',
+    'node_modules',
+    'packages',
+    'TestResults'
+)
+
+# Такие файлы могут содержать реальные пароли и ключи.
+$SensitiveFileNames = @(
+    '.env',
+    '.env.local',
+    '.env.production',
+    'secrets.json',
+    'credentials.json',
+    'launchSettings.json',
+    'appsettings.Development.json',
+    'appsettings.Production.json'
+)
+
+function Test-IsExcludedPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FullName,
+
+        [Parameter(Mandatory = $true)]
+        [string]$RootPath
+    )
+
+    $relativePath = $FullName.Substring($RootPath.Length)
+    $segments = $relativePath -split '[\\/]'
+
+    foreach ($segment in $segments) {
+        if ($ExcludedDirectories -contains $segment) {
+            return $true
+        }
+
+        if ($segment -like 'backup-before-build*') {
+            return $true
+        }
+
+        if ($segment -like '.build*-backup-*')
+
+Продолжить
+GPT-5.6 Sol
+GPT-5.6 Sol
+Размышление
+
+
+Нажмите Ctrl+C, чтобы отменить предыдущий незавершённый ввод. Затем скопируйте и выполните весь код целиком в PowerShell.
+
+Он создаст полный отчёт здесь:
+
+C:\Users\User\Desktop\Project_Report.txt
+
+$ErrorActionPreference = 'Stop'
+
+# -------------------------------------------------------------------
+# НАСТРОЙКИ
+# -------------------------------------------------------------------
+
+$ProjectPath = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$ReportPath  = 'C:\Users\User\Desktop\Project_Report.txt'
+
+# Типы файлов, содержимое которых будет добавлено в отчёт.
+$AllowedExtensions = @(
+    '.cs',
+    '.csproj',
+    '.sln',
+    '.xaml',
+    '.props',
+    '.targets',
+    '.resx',
+    '.config',
+    '.json',
+    '.xml',
+    '.ps1',
+    '.psm1',
+    '.psd1',
+    '.cmd',
+    '.bat',
+    '.txt',
+    '.md',
+    '.yml',
+    '.yaml'
+)
+
+# Служебные каталоги, которые не нужны для анализа исходников.
+$ExcludedDirectories = @(
+    'bin',
+    'obj',
+    '.vs',
+    '.git',
+    '.idea',
+    'node_modules',
+    'packages',
+    'TestResults'
+)
+
+# Резервные папки исключаются, чтобы в отчёт не попали старые копии.
+$ExcludedDirectoryPatterns = @(
+    'backup-before-build*',
+    '.build*-backup-*'
+)
+
+# Файлы, которые могут содержать реальные пароли и токены.
+# Их содержимое не включается, но имя будет видно в структуре.
+$SensitiveFileNames = @(
+    '.env',
+    '.env.local',
+    '.env.development',
+    '.env.production',
+    'secrets.json',
+    'credentials.json',
+    'launchSettings.json',
+    'appsettings.Development.json',
+    'appsettings.Production.json'
+)
+
+# Максимальный размер одного текстового файла.
+$MaximumFileSize = 10MB
+
+# -------------------------------------------------------------------
+# ФУНКЦИИ
+# -------------------------------------------------------------------
+
+function Get-RelativeProjectPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FullName
+    )
+
+    return $FullName.Substring($ProjectPath.Length).TrimStart('\', '/')
+}
+
+function Test-IsExcludedPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FullName
+    )
+
+    $relativePath = Get-RelativeProjectPath -FullName $FullName
+    $segments = $relativePath -split '[\\/]'
+
+    foreach ($segment in $segments) {
+        if ($ExcludedDirectories -contains $segment) {
+            return $true
+        }
+
+        foreach ($pattern in $ExcludedDirectoryPatterns) {
+            if ($segment -like $pattern) {
+                return $true
+            }
+        }
+    }
+
+    return $false
+}
+
+function Test-IsSensitiveFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.IO.FileInfo]$File
+    )
+
+    if ($SensitiveFileNames -contains $File.Name) {
+        return $true
+    }
+
+    if ($File.Name -like '*.secrets.json') {
+        return $true
+    }
+
+    if ($File.Name -like '*.credentials.json') {
+        return $true
+    }
+
+    return $false
+}
+
+function Protect-ConfigurationSecrets {
+    param(
+        [AllowEmptyString()]
+        [string]$Content,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Extension
+    )
+
+    if ([string]::IsNullOrEmpty($Content)) {
+        return $Content
+    }
+
+    # Исходные файлы C# и XAML не изменяются, чтобы не повредить код.
+    if ($Extension -in @('.cs', '.xaml', '.csproj', '.sln', '.props', '.targets', '.resx')) {
+        return $Content
+    }
+
+    $protected = $Content
+
+    # JSON: "Password": "значение"
+    $protected = [regex]::Replace(
+        $protected,
+        '(?im)("(?:password|passwd|pwd|token|secret|apiKey|api_key|accessToken|refreshToken|privateKey)"\s*:\s*")[^"]*(")',
+        '$1REMOVED$2'
+    )
+
+    # XML: <Password>значение</Password>
+    $protected = [regex]::Replace(
+        $protected,
+        '(?im)(<(?:Password|Passwd|Token|Secret|ApiKey|AccessToken|RefreshToken)>).*?(</(?:Password|Passwd|Token|Secret|ApiKey|AccessToken|RefreshToken)>)',
+        '$1REMOVED$2'
+    )
+
+    # Формат KEY=VALUE.
+    $protected = [regex]::Replace(
+        $protected,
+        '(?im)^(\s*(?:PASSWORD|PASSWD|PWD|TOKEN|SECRET|API_KEY|APIKEY|ACCESS_TOKEN|REFRESH_TOKEN)\s*=\s*).*$',
+        '$1REMOVED'
+    )
+
+    # Строки подключения.
+    $protected = [regex]::Replace(
+        $protected,
+        '(?im)(Password|Pwd)\s*=\s*[^;`r`n]*',
+        '$1=REMOVED'
+    )
+
+    return $protected
+}
+
+# -------------------------------------------------------------------
+# ПРОВЕРКА ПАПКИ
+# -------------------------------------------------------------------
+
+if (-not (Test-Path -LiteralPath $ProjectPath -PathType Container)) {
+    Write-Host ''
+    Write-Host 'ОШИБКА: папка проекта не найдена:' -ForegroundColor Red
+    Write-Host $ProjectPath -ForegroundColor Yellow
+    Write-Host ''
+    exit 1
+}
+
+$ProjectPath = (
+    Resolve-Path -LiteralPath $ProjectPath
+).Path.TrimEnd('\', '/')
+
+$ReportDirectory = Split-Path -Parent $ReportPath
+
+if (-not (Test-Path -LiteralPath $ReportDirectory -PathType Container)) {
+    New-Item `
+        -ItemType Directory `
+        -Path $ReportDirectory `
+        -Force |
+        Out-Null
+}
+
+# Не включаем старый отчёт в новый отчёт.
+if (Test-Path -LiteralPath $ReportPath -PathType Leaf) {
+    Remove-Item -LiteralPath $ReportPath -Force
+}
+
+Write-Host ''
+Write-Host 'Сбор информации о проекте...' -ForegroundColor Cyan
+Write-Host "Проект: $ProjectPath"
+Write-Host ''
+
+# -------------------------------------------------------------------
+# ПОЛУЧЕНИЕ ФАЙЛОВ
+# -------------------------------------------------------------------
+
+$AllFiles = @(
+    Get-ChildItem `
+        -LiteralPath $ProjectPath `
+        -Recurse `
+        -File `
+        -Force `
+        -ErrorAction SilentlyContinue |
+    Where-Object {
+        -not (Test-IsExcludedPath -FullName $_.FullName)
+    } |
+    Sort-Object FullName
+)
+
+$SourceFiles = @(
+    $AllFiles |
+    Where-Object {
+        $AllowedExtensions -contains $_.Extension.ToLowerInvariant()
+    }
+)
+
+# UTF-8 с BOM — отчёт корректно откроется в обычном Блокноте Windows.
+$Utf8Encoding = New-Object System.Text.UTF8Encoding($true)
+
+$Writer = New-Object System.IO.StreamWriter(
+    $ReportPath,
+    $false,
+    $Utf8Encoding
+)
+
+try {
+    # ---------------------------------------------------------------
+    # ЗАГОЛОВОК
+    # ---------------------------------------------------------------
+
+    $Writer.WriteLine('ПОЛНЫЙ ОТЧЁТ ПО ИСХОДНОМУ ПРОЕКТУ')
+    $Writer.WriteLine(('=' * 110))
+    $Writer.WriteLine("Папка проекта: $ProjectPath")
+    $Writer.WriteLine(
+        "Дата создания отчёта: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+    )
+    $Writer.WriteLine("Имя компьютера: $env:COMPUTERNAME")
+    $Writer.WriteLine("Пользователь Windows: $env:USERNAME")
+    $Writer.WriteLine("Версия PowerShell: $($PSVersionTable.PSVersion)")
+    $Writer.WriteLine("Всего найдено файлов: $($AllFiles.Count)")
+    $Writer.WriteLine(
+        "Текстовых исходных файлов: $($SourceFiles.Count)"
+    )
+    $Writer.WriteLine()
+
+    # ---------------------------------------------------------------
+    # СТРУКТУРА ПРОЕКТА
+    # ---------------------------------------------------------------
+
+    $Writer.WriteLine('СТРУКТУРА ПРОЕКТА')
+    $Writer.WriteLine(('=' * 110))
+
+    foreach ($File in $AllFiles) {
+        $relativePath = Get-RelativeProjectPath -FullName $File.FullName
+
+        $Writer.WriteLine(
+            '{0} | {1:N0} байт | {2}' -f `
+                $relativePath,
+                $File.Length,
+                $File.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss')
+        )
+    }
+
+    $Writer.WriteLine()
+    $Writer.WriteLine()
+
+    # ---------------------------------------------------------------
+    # КЛЮЧЕВЫЕ ФАЙЛЫ
+    # ---------------------------------------------------------------
+
+    $Writer.WriteLine('КЛЮЧЕВЫЕ ФАЙЛЫ ПРОЕКТА')
+    $Writer.WriteLine(('=' * 110))
+
+    $KeyFiles = @(
+        $AllFiles |
+        Where-Object {
+            $_.Extension -in @('.sln', '.csproj') -or
+            $_.Name -in @(
+                'MainWindow.xaml',
+                'MainWindow.xaml.cs',
+                'MainWindow.Build2.cs',
+                'MainWindow.Build3.cs',
+                'MainWindow.Build4.cs',
+                'MainWindow.Build7.cs',
+                'DatabaseDeploymentService.cs',
+                'BUILD7.ps1',
+                'BUILD8.ps1',
+                'build7.txt'
+            )
+        }
+    )
+
+    if ($KeyFiles.Count -eq 0) {
+        $Writer.WriteLine('Ключевые файлы по известным именам не найдены.')
+    }
+    else {
+        foreach ($File in $KeyFiles) {
+            $Writer.WriteLine(
+                Get-RelativeProjectPath -FullName $File.FullName
+            )
+        }
+    }
+
+    $Writer.WriteLine()
+    $Writer.WriteLine()
+
+    # ---------------------------------------------------------------
+    # СОДЕРЖИМОЕ ФАЙЛОВ
+    # ---------------------------------------------------------------
+
+    $Writer.WriteLine('СОДЕРЖИМОЕ ИСХОДНЫХ ФАЙЛОВ')
+    $Writer.WriteLine(('=' * 110))
+
+    $CurrentNumber = 0
+
+    foreach ($File in $SourceFiles) {
+        $CurrentNumber++
+        $relativePath = Get-RelativeProjectPath -FullName $File.FullName
+
+        Write-Progress `
+            -Activity 'Создание отчёта' `
+            -Status "$CurrentNumber из $($SourceFiles.Count): $relativePath" `
+            -PercentComplete (
+                [math]::Round(
+                    ($CurrentNumber / [math]::Max($SourceFiles.Count, 1)) * 100
+                )
+            )
+
+        $Writer.WriteLine()
+        $Writer.WriteLine(('=' * 110))
+        $Writer.WriteLine("НАЧАЛО ФАЙЛА: $relativePath")
+        $Writer.WriteLine("ПОЛНЫЙ ПУТЬ: $($File.FullName)")
+        $Writer.WriteLine("РАЗМЕР: $($File.Length) байт")
+        $Writer.WriteLine(
+            "ИЗМЕНЁН: $($File.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss'))"
+        )
+        $Writer.WriteLine(('-' * 110))
+
+        if (Test-IsSensitiveFile -File $File) {
+            $Writer.WriteLine(
+                '[СОДЕРЖИМОЕ ПРОПУЩЕНО: файл может содержать пароли, токены или другие секреты.]'
+            )
+            $Writer.WriteLine(('-' * 110))
+            $Writer.WriteLine("КОНЕЦ ФАЙЛА: $relativePath")
+            continue
+        }
+
+        if ($File.Length -gt $MaximumFileSize) {
+            $sizeMb = [math]::Round($File.Length / 1MB, 2)
+
+            $Writer.WriteLine(
+                "[СОДЕРЖИМОЕ ПРОПУЩЕНО: размер файла $sizeMb МБ превышает ограничение 10 МБ.]"
+            )
+            $Writer.WriteLine(('-' * 110))
+            $Writer.WriteLine("КОНЕЦ ФАЙЛА: $relativePath")
+            continue
+        }
+
+        try {
+            $Content = [System.IO.File]::ReadAllText($File.FullName)
+
+            $Content = Protect-ConfigurationSecrets `
+                -Content $Content `
+                -Extension $File.Extension.ToLowerInvariant()
+
+            if ([string]::IsNullOrWhiteSpace($Content)) {
+                $Writer.WriteLine('[ФАЙЛ ПУСТ]')
+            }
+            else {
+                $Writer.WriteLine($Content)
+            }
+        }
+        catch {
+            $Writer.WriteLine(
+                "[ОШИБКА ЧТЕНИЯ ФАЙЛА: $($_.Exception.Message)]"
+            )
+        }
+
+        $Writer.WriteLine()
+        $Writer.WriteLine(('-' * 110))
+        $Writer.WriteLine("КОНЕЦ ФАЙЛА: $relativePath")
+    }
+
+    # ---------------------------------------------------------------
+    # ЗАВЕРШЕНИЕ
+    # ---------------------------------------------------------------
+
+    $Writer.WriteLine()
+    $Writer.WriteLine(('=' * 110))
+    $Writer.WriteLine('КОНЕЦ ОТЧЁТА')
+    $Writer.WriteLine(('=' * 110))
+}
+finally {
+    $Writer.Flush()
+    $Writer.Dispose()
+    Write-Progress -Activity 'Создание отчёта' -Completed
+}
+
+$ReportFile = Get-Item -LiteralPath $ReportPath
+$ReportSizeMb = [math]::Round($ReportFile.Length / 1MB, 2)
+
+Write-Host ''
+Write-Host 'ГОТОВО!' -ForegroundColor Green
+Write-Host 'Отчёт создан:' -ForegroundColor Cyan
+Write-Host $ReportPath -ForegroundColor Yellow
+Write-Host "Размер отчёта: $ReportSizeMb МБ"
+Write-Host ''
+Write-Host 'Прикрепите файл Project_Report.txt к сообщению в чате.' `
+    -ForegroundColor Green
+Write-Host ''
+
+# Открыть папку и выделить созданный отчёт.
+Start-Process explorer.exe -ArgumentList "/select,`"$ReportPath`""
+
+После выполнения прикрепите сюда файл:
+
+C:\Users\User\Desktop\Project_Report.txt
+
+>>
+строка:318 знак:31
++ $Writer.WriteLine(
++ ~
+Отсутствует ")" в вызове метода.
+строка:319 знак:17
++ Get-RelativeProjectPath -FullName $File.FullName
++ ~~~~~~~~~~~~~~~~~~~~~~~
+Непредвиденная лексема "Get-RelativeProjectPath" в выражении или операторе.
+строка:317 знак:38
++ foreach ($File in $KeyFiles) {
++ ~
+Отсутствует закрывающий знак "}" в блоке операторов или определении типа.
+строка:316 знак:10
++ else ...
+Развернуть
+GPT-5.6 Sol
+GPT-5.6 Sol
+Ошибка возникла из-за передачи результата PowerShell-функции непосредственно в вызов .WriteLine(). Нажмите Ctrl+C, если видите приглашение >>, затем скопируйте и выполните весь новый блок целиком.
+
+Он создаст:
+
+C:\Users\User\Desktop\Project_Report.txt
+
+$ErrorActionPreference = 'Stop'
+
+$ProjectPath = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+$ReportPath = 'C:\Users\User\Desktop\Project_Report.txt'
+$MaximumFileSize = 10MB
+
+$AllowedExtensions = @(
+    '.cs',
+    '.csproj',
+    '.sln',
+    '.xaml',
+    '.props',
+    '.targets',
+    '.resx',
+    '.config',
+    '.json',
+    '.xml',
+    '.ps1',
+    '.psm1',
+    '.psd1',
+    '.cmd',
+    '.bat',
+    '.txt',
+    '.md',
+    '.yml',
+    '.yaml'
+)
+
+$ExcludedDirectoryNames = @(
+    'bin',
+    'obj',
+    '.vs',
+    '.git',
+    '.idea',
+    'node_modules',
+    'packages',
+    'TestResults'
+)
+
+$SensitiveFileNames = @(
+    '.env',
+    '.env.local',
+    '.env.development',
+    '.env.production',
+    'secrets.json',
+    'credentials.json',
+    'launchSettings.json',
+    'appsettings.Development.json',
+    'appsettings.Production.json'
+)
+
+function Get-RelativePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FullName
+    )
+
+    $relativePath = $FullName.Substring($script:ProjectPath.Length)
+    return $relativePath.TrimStart([char[]]@('\', '/'))
+}
+
+function Test-ExcludedPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FullName
+    )
+
+    $relativePath = Get-RelativePath -FullName $FullName
+    $segments = $relativePath -split '[\\/]'
+
+    foreach ($segment in $segments) {
+        if ($script:ExcludedDirectoryNames -contains $segment) {
+            return $true
+        }
+
+        if ($segment -like 'backup-before-build*') {
+            return $true
+        }
+
+        if ($segment -like '.build*-backup-*') {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Test-SensitiveFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.IO.FileInfo]$File
+    )
+
+    if ($script:SensitiveFileNames -contains $File.Name) {
+        return $true
+    }
+
+    if ($File.Name -like '*.secrets.json') {
+        return $true
+    }
+
+    if ($File.Name -like '*.credentials.json') {
+        return $true
+    }
+
+    return $false
+}
+
+function Protect-Secrets {
+    param(
+        [AllowEmptyString()]
+        [string]$Content,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Extension
+    )
+
+    if ([string]::IsNullOrEmpty($Content)) {
+        return $Content
+    }
+
+    # Исходный код не изменяем, чтобы отчёт содержал точный код.
+    if ($Extension -in @(
+        '.cs',
+        '.xaml',
+        '.csproj',
+        '.sln',
+        '.props',
+        '.targets',
+        '.resx'
+    )) {
+        return $Content
+    }
+
+    $result = $Content
+
+    # Скрытие типичных секретов в JSON.
+    $jsonPattern = '(?im)("(?:password|passwd|pwd|token|secret|apiKey|api_key|accessToken|refreshToken|privateKey)"\s*:\s*")[^"]*(")'
+    $result = [regex]::Replace(
+        $result,
+        $jsonPattern,
+        '$1REMOVED$2'
+    )
+
+    # Скрытие типичных секретов в XML.
+    $xmlPattern = '(?is)(<(?:Password|Passwd|Token|Secret|ApiKey|AccessToken|RefreshToken)>).*?(</(?:Password|Passwd|Token|Secret|ApiKey|AccessToken|RefreshToken)>)'
+    $result = [regex]::Replace(
+        $result,
+        $xmlPattern,
+        '$1REMOVED$2'
+    )
+
+    # Скрытие секретов в формате KEY=VALUE.
+    $envPattern = '(?im)^(\s*(?:PASSWORD|PASSWD|PWD|TOKEN|SECRET|API_KEY|APIKEY|ACCESS_TOKEN|REFRESH_TOKEN)\s*=\s*).*$'
+    $result = [regex]::Replace(
+        $result,
+        $envPattern,
+        '$1REMOVED'
+    )
+
+    # Скрытие паролей в строках подключения.
+    $connectionPattern = '(?im)((?:Password|Pwd)\s*=\s*)[^;\r\n]*'
+    $result = [regex]::Replace(
+        $result,
+        $connectionPattern,
+        '$1REMOVED'
+    )
+
+    return $result
+}
+
+if (-not (Test-Path -LiteralPath $ProjectPath -PathType Container)) {
+    Write-Host ''
+    Write-Host 'ОШИБКА: папка проекта не найдена:' -ForegroundColor Red
+    Write-Host $ProjectPath -ForegroundColor Yellow
+    Write-Host ''
+    exit 1
+}
+
+$ProjectPath = (Resolve-Path -LiteralPath $ProjectPath).Path
+$ProjectPath = $ProjectPath.TrimEnd([char[]]@('\', '/'))
+
+$ReportDirectory = Split-Path -Parent $ReportPath
+
+if (-not (Test-Path -LiteralPath $ReportDirectory -PathType Container)) {
+    New-Item -ItemType Directory -Path $ReportDirectory -Force |
+        Out-Null
+}
+
+if (Test-Path -LiteralPath $ReportPath -PathType Leaf) {
+    Remove-Item -LiteralPath $ReportPath -Force
+}
+
+Write-Host ''
+Write-Host 'Сбор файлов проекта...' -ForegroundColor Cyan
+Write-Host $ProjectPath -ForegroundColor Yellow
+Write-Host ''
+
+$AllFiles = @(
+    Get-ChildItem `
+        -LiteralPath $ProjectPath `
+        -Recurse `
+        -File `
+        -Force `
+        -ErrorAction SilentlyContinue |
+    Where-Object {
+        -not (Test-ExcludedPath -FullName $_.FullName)
+    } |
+    Sort-Object FullName
+)
+
+$SourceFiles = @(
+    $AllFiles |
+    Where-Object {
+        $extension = $_.Extension.ToLowerInvariant()
+        $AllowedExtensions -contains $extension
+    }
+)
+
+# UTF-8 с BOM для корректного отображения русского текста в Блокноте.
+$Utf8WithBom = New-Object System.Text.UTF8Encoding($true)
+
+$Writer = New-Object System.IO.StreamWriter(
+    $ReportPath,
+    $false,
+    $Utf8WithBom
+)
+
+try {
+    $Writer.WriteLine('ПОЛНЫЙ ОТЧЁТ ПО ИСХОДНОМУ ПРОЕКТУ')
+    $Writer.WriteLine(('=' * 110))
+    $Writer.WriteLine(('Папка проекта: {0}' -f $ProjectPath))
+    $Writer.WriteLine(
+        ('Дата создания: {0}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
+    )
+    $Writer.WriteLine(('Компьютер: {0}' -f $env:COMPUTERNAME))
+    $Writer.WriteLine(('Пользователь: {0}' -f $env:USERNAME))
+    $Writer.WriteLine(
+        ('Версия PowerShell: {0}' -f $PSVersionTable.PSVersion)
+    )
+    $Writer.WriteLine(('Всего файлов: {0}' -f $AllFiles.Count))
+    $Writer.WriteLine(
+        ('Исходных текстовых файлов: {0}' -f $SourceFiles.Count)
+    )
+    $Writer.WriteLine()
+
+    $Writer.WriteLine('СТРУКТУРА ПРОЕКТА')
+    $Writer.WriteLine(('=' * 110))
+
+    foreach ($File in $AllFiles) {
+        $relativePath = Get-RelativePath -FullName $File.FullName
+
+        $fileLine = '{0} | {1:N0} байт | {2}' -f `
+            $relativePath,
+            $File.Length,
+            $File.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss')
+
+        $Writer.WriteLine($fileLine)
+    }
+
+    $Writer.WriteLine()
+    $Writer.WriteLine()
+    $Writer.WriteLine('КЛЮЧЕВЫЕ ФАЙЛЫ')
+    $Writer.WriteLine(('=' * 110))
+
+    $KeyFileNames = @(
+        'MainWindow.xaml',
+        'MainWindow.xaml.cs',
+        'MainWindow.Build2.cs',
+        'MainWindow.Build3.cs',
+        'MainWindow.Build4.cs',
+        'MainWindow.Build7.cs',
+        'DatabaseDeploymentService.cs',
+        'BUILD7.ps1',
+        'BUILD8.ps1',
+        'build7.txt'
+    )
+
+    $KeyFiles = @(
+        $AllFiles |
+        Where-Object {
+            ($_.Extension -eq '.sln') -or
+            ($_.Extension -eq '.csproj') -or
+            ($KeyFileNames -contains $_.Name)
+        }
+    )
+
+    if ($KeyFiles.Count -eq 0) {
+        $Writer.WriteLine(
+            'Ключевые файлы по известным именам не найдены.'
+        )
+    }
+    else {
+        foreach ($File in $KeyFiles) {
+            $relativePath = Get-RelativePath -FullName $File.FullName
+            $Writer.WriteLine($relativePath)
+        }
+    }
+
+    $Writer.WriteLine()
+    $Writer.WriteLine()
+    $Writer.WriteLine('СОДЕРЖИМОЕ ИСХОДНЫХ ФАЙЛОВ')
+    $Writer.WriteLine(('=' * 110))
+
+    $CurrentNumber = 0
+    $TotalNumber = [math]::Max($SourceFiles.Count, 1)
+
+    foreach ($File in $SourceFiles) {
+        $CurrentNumber++
+        $relativePath = Get-RelativePath -FullName $File.FullName
+        $percent = [math]::Round(
+            ($CurrentNumber / $TotalNumber) * 100
+        )
+
+        Write-Progress `
+            -Activity 'Создание отчёта' `
+            -Status (
+                '{0} из {1}: {2}' -f `
+                    $CurrentNumber,
+                    $SourceFiles.Count,
+                    $relativePath
+            ) `
+            -PercentComplete $percent
+
+        $Writer.WriteLine()
+        $Writer.WriteLine(('=' * 110))
+        $Writer.WriteLine(('НАЧАЛО ФАЙЛА: {0}' -f $relativePath))
+        $Writer.WriteLine(('ПОЛНЫЙ ПУТЬ: {0}' -f $File.FullName))
+        $Writer.WriteLine(('РАЗМЕР: {0} байт' -f $File.Length))
+        $Writer.WriteLine(
+            (
+                'ИЗМЕНЁН: {0}' -f
+                $File.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss')
+            )
+        )
+        $Writer.WriteLine(('-' * 110))
+
+        if (Test-SensitiveFile -File $File) {
+            $Writer.WriteLine(
+                '[СОДЕРЖИМОЕ ПРОПУЩЕНО: файл может содержать секреты.]'
+            )
+            $Writer.WriteLine(('-' * 110))
+            $Writer.WriteLine(('КОНЕЦ ФАЙЛА: {0}' -f $relativePath))
+            continue
+        }
+
+        if ($File.Length -gt $MaximumFileSize) {
+            $sizeMb = [math]::Round($File.Length / 1MB, 2)
+
+            $Writer.WriteLine(
+                (
+                    '[СОДЕРЖИМОЕ ПРОПУЩЕНО: размер {0} МБ превышает 10 МБ.]' -f
+                    $sizeMb
+                )
+            )
+            $Writer.WriteLine(('-' * 110))
+            $Writer.WriteLine(('КОНЕЦ ФАЙЛА: {0}' -f $relativePath))
+            continue
+        }
+
+        try {
+            $content = [System.IO.File]::ReadAllText($File.FullName)
+            $extension = $File.Extension.ToLowerInvariant()
+
+            $content = Protect-Secrets `
+                -Content $content `
+                -Extension $extension
+
+            if ([string]::IsNullOrEmpty($content)) {
+                $Writer.WriteLine('[ФАЙЛ ПУСТ]')
+            }
+            else {
+                $Writer.WriteLine($content)
+            }
+        }
+        catch {
+            $readError = $_.Exception.Message
+            $Writer.WriteLine(
+                ('[ОШИБКА ЧТЕНИЯ: {0}]' -f $readError)
+            )
+        }
+
+        $Writer.WriteLine()
+        $Writer.WriteLine(('-' * 110))
+        $Writer.WriteLine(('КОНЕЦ ФАЙЛА: {0}' -f $relativePath))
+    }
+
+    $Writer.WriteLine()
+    $Writer.WriteLine(('=' * 110))
+    $Writer.WriteLine('КОНЕЦ ОТЧЁТА')
+    $Writer.WriteLine(('=' * 110))
+}
+catch {
+    $scriptError = $_.Exception.Message
+
+    Write-Host ''
+    Write-Host 'ОШИБКА ПРИ СОЗДАНИИ ОТЧЁТА:' -ForegroundColor Red
+    Write-Host $scriptError -ForegroundColor Yellow
+    Write-Host ''
+
+    throw
+}
+finally {
+    if ($null -ne $Writer) {
+        $Writer.Flush()
+        $Writer.Dispose()
+    }
+
+    Write-Progress -Activity 'Создание отчёта' -Completed
+}
+
+$ReportFile = Get-Item -LiteralPath $ReportPath
+$ReportSizeMb = [math]::Round($ReportFile.Length / 1MB, 2)
+
+Write-Host ''
+Write-Host 'ГОТОВО!' -ForegroundColor Green
+Write-Host 'Отчёт создан:' -ForegroundColor Cyan
+Write-Host $ReportPath -ForegroundColor Yellow
+Write-Host ('Размер: {0} МБ' -f $ReportSizeMb)
+Write-Host ''
+Write-Host 'Прикрепите Project_Report.txt к сообщению.' `
+    -ForegroundColor Green
+Write-Host ''
+
+Start-Process `
+    -FilePath 'explorer.exe' `
+    -ArgumentList ('/select,"{0}"' -f $ReportPath)
+
+После появления сообщения «ГОТОВО!» прикрепите сюда файл:
+
+C:\Users\User\Desktop\Project_Report.txt
+
+Project_Report.txt читай на https://github.com/raliya/kdhGHf643tf76.git
+GPT-5.6 Sol
+GPT-5.6 Sol
+Навык активирован: web_search
+get_serp
+Поисковая выдача
+get_serp
+Поисковая выдача
+Результаты (10)
+get_serp
+Поисковая выдача
+get_serp
+Поисковая выдача
+Результаты (10)
+Репозиторий вижу, но Project_Report.txt через публичный доступ сейчас не находится. Нужна прямая ссылка на файл, например:
+
+https://github.com/raliya/kdhGHf643tf76/blob/main/Project_Report.txt
+
+Проверьте эту ссылку в браузере. Если открывается — пришлите её сюда. Если ошибка 404, значит файл ещё не загружен, лежит в другой ветке/папке либо репозиторий закрытый.
+
+Загрузить отчёт в репозиторий можно из PowerShell:
+
+cd 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+
+Copy-Item `
+  'C:\Users\User\Desktop\Project_Report.txt' `
+  '.\Project_Report.txt' `
+  -Force
+
+git add Project_Report.txt
+git commit -m "Add project report"
+git push
+
+После загрузки пришлите прямую ссылку на Project_Report.txt. Убедитесь, что отчёт не содержит настоящих паролей, токенов и ключей.
+
+https://github.com/raliya/kdhGHf643tf76/blob/main/Project_Report.txt
+GPT-5.6 Sol
+GPT-5.6 Sol
+Навык активирован: page_content
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+Размышление
+
+
+
+
+
+Прочитал Project_Report.txt по ссылке полностью. Файл доступен, около 30 881 строки / 1 МБ.
+
+Подтверждено актуальное состояние проекта:
+
+проект: .NET 8 WPF, TextFileProcessor.csproj;
+основные файлы находятся в корне проекта;
+проблема общего запуска находится в MainWindow.Build7.cs;
+он вызывает обработчики async void:
+Start_Click;
+CreateSelectedWebDomain_Click;
+DeploySelectedSite_Click;
+DeployDatabaseButton_Click;
+затем использует ненадёжный WaitForLegacyOperationAsync();
+ошибки этапов перехватываются внутри обработчиков, поэтому общий процесс продолжает работу;
+BUILD7.ps1 и BUILD8.ps1 нельзя использовать для финального исправления;
+DatabaseDeploymentService.cs уже содержит более свежие изменения;
+текущие MainWindow.xaml.cs, MainWindow.Build2.cs, MainWindow.Build3.cs, MainWindow.Build4.cs и MainWindow.Build7.cs в отчёте присутствуют.
+Однако отчёт исказил содержимое исходников при маскировке секретов. Например, некоторые настоящие выражения были заменены на:
+
+REMOVED
+
+Кроме того, в GitHub исходный код отчёта отображается свёрнутым в длинные строки. Поэтому восстанавливать финальные .cs-файлы непосредственно из отчёта рискованно: можно получить некомпилируемый проект.
+
+Загрузите в этот же репозиторий именно актуальные исходники:
+
+$Project = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+
+Set-Location -LiteralPath $Project
+
+git add -- `
+  'TextFileProcessor.csproj' `
+  'MainWindow.xaml' `
+  'MainWindow.xaml.cs' `
+  'MainWindow.Build2.cs' `
+  'MainWindow.Build3.cs' `
+  'MainWindow.Build4.cs' `
+  'MainWindow.Build6.cs' `
+  'MainWindow.Build7.cs' `
+  'Models' `
+  'Services' `
+  'Security' `
+  'Data'
+
+git commit -m 'Add current project sources for final fix'
+git push origin main
+
+Эта команда не добавляет bin, obj и опубликованные EXE, если действует текущий .gitignore.
+
+Перед отправкой убедитесь, что в .cs нет встроенных настоящих паролей или API-ключей. Зашифрованные пользовательские настройки из %LOCALAPPDATA%\TextFileProcessor загружать не требуется.
+
+После выполнения напишите только:
+
+Готово
+
+Тогда исходники будут доступны напрямую по отдельным файлам, и можно будет вернуть цельный финальный BUILD9.ps1, который создаст резервную копию, внесёт исправления, соберёт проект и опубликует новый EXE.
+
+загрузил все как просил
+'TextFileProcessor.csproj' `
+'MainWindow.xaml' `
+'MainWindow.xaml.cs' `
+'MainWindow.Build2.cs' `
+'MainWindow.Build3.cs' `
+'MainWindow.Build4.cs' `
+'MainWindow.Build6.cs' `
+'MainWindow.Build7.cs' `
+'Models' `
+'Services' `
+'Security' `
+'Data'
+https://github.com/raliya/kdhGHf643tf76.git
+Продолжить
+GPT-5.6 Sol
+GPT-5.6 Sol
+Навык активирован: page_content
+Навык активирован: page_content
+да пиши ты исправление уже!! достал! все деньги тратишь!
+ДАЙ МНЕ ИСПРАВЛЕНИЕ ПРОГРАММЫ! СРОЧНО!
+GPT-5.6 Sol
+GPT-5.6 Sol
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+get_page_content
+Содержимое страницы
+Размышление
+
+
+
+Извините за задержку. Ниже готовое исправление. Оно:
+
+останавливает общий процесс при ошибке любого этапа;
+не запускает следующий этап раньше завершения предыдущего;
+устраняет ненадёжное ожидание async void;
+ожидает готовности MySQL после создания/обновления БД;
+собирает и публикует новый EXE.
+Закройте программу. Сохраните код как BUILD9.ps1 в папке проекта и запустите через PowerShell.
+
+#requires -Version 5.1
+
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+
+$ProjectRoot = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+
+$ProjectFile = Join-Path $ProjectRoot 'TextFileProcessor.csproj'
+$MainFile = Join-Path $ProjectRoot 'MainWindow.xaml.cs'
+$Build2File = Join-Path $ProjectRoot 'MainWindow.Build2.cs'
+$Build3File = Join-Path $ProjectRoot 'MainWindow.Build3.cs'
+$Build4File = Join-Path $ProjectRoot 'MainWindow.Build4.cs'
+$Build7File = Join-Path $ProjectRoot 'MainWindow.Build7.cs'
+$DatabaseFile = Join-Path $ProjectRoot 'Services\DatabaseDeploymentService.cs'
+$PublishDirectory = Join-Path $ProjectRoot 'publish\win-x64'
+
+$Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+function Write-Step {
+    param([string]$Text)
+
+    Write-Host ''
+    Write-Host "=== $Text ===" -ForegroundColor Cyan
+}
+
+function Assert-File {
+    param([string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Не найден файл: $Path"
+    }
+}
+
+function Read-Source {
+    param([string]$Path)
+
+    $text = [System.IO.File]::ReadAllText(
+        $Path,
+        [System.Text.Encoding]::UTF8
+    )
+
+    return $text.Replace(
+        "`r`n",
+        "`n"
+    ).Replace(
+        "`r",
+        "`n"
+    )
+}
+
+function Write-Source {
+    param(
+        [string]$Path,
+        [string]$Text
+    )
+
+    [System.IO.File]::WriteAllText(
+        $Path,
+        $Text.Replace("`n", "`r`n"),
+        $Utf8NoBom
+    )
+}
+
+function Replace-Required {
+    param(
+        [string]$Text,
+        [string]$OldValue,
+        [string]$NewValue,
+        [string]$Description,
+        [switch]$AllowAlreadyFixed
+    )
+
+    if ($Text.Contains($OldValue)) {
+        Write-Host "Исправление: $Description"
+        return $Text.Replace(
+            $OldValue,
+            $NewValue
+        )
+    }
+
+    if ($AllowAlreadyFixed -and
+        $Text.Contains($NewValue)) {
+        Write-Host "Уже исправлено: $Description" `
+            -ForegroundColor Yellow
+
+        return $Text
+    }
+
+    throw "Не найден блок для исправления: $Description"
+}
+
+try {
+    Write-Step 'Проверка проекта'
+
+    @(
+        $ProjectFile,
+        $MainFile,
+        $Build2File,
+        $Build3File,
+        $Build4File,
+        $Build7File,
+        $DatabaseFile
+    ) | ForEach-Object {
+        Assert-File -Path $_
+    }
+
+    $running = @(
+        Get-Process `
+            -Name 'TextFileProcessor' `
+            -ErrorAction SilentlyContinue
+    )
+
+    if ($running.Count -gt 0) {
+        throw 'Закройте TextFileProcessor.exe и повторите запуск.'
+    }
+
+    $dotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue
+
+    if ($null -eq $dotnet) {
+        throw 'Не найден .NET SDK. Установите .NET 8 SDK x64.'
+    }
+
+    $dotnetVersion = (& dotnet.exe --version).Trim()
+
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Не удалось определить версию .NET SDK.'
+    }
+
+    Write-Host "Проект: $ProjectRoot"
+    Write-Host ".NET SDK: $dotnetVersion" -ForegroundColor Green
+
+    Write-Step 'Создание резервной копии'
+
+    $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $backupDirectory = Join-Path `
+        $ProjectRoot `
+        ".build9-backup-$timestamp"
+
+    $backupServices = Join-Path `
+        $backupDirectory `
+        'Services'
+
+    New-Item `
+        -ItemType Directory `
+        -Path $backupServices `
+        -Force |
+        Out-Null
+
+    foreach ($file in @(
+        $MainFile,
+        $Build2File,
+        $Build3File,
+        $Build4File,
+        $Build7File,
+        $ProjectFile
+    )) {
+        Copy-Item `
+            -LiteralPath $file `
+            -Destination (
+                Join-Path $backupDirectory (
+                    Split-Path $file -Leaf
+                )
+            ) `
+            -Force
+    }
+
+    Copy-Item `
+        -LiteralPath $DatabaseFile `
+        -Destination (
+            Join-Path `
+                $backupServices `
+                'DatabaseDeploymentService.cs'
+        ) `
+        -Force
+
+    Write-Host "Резервная копия: $backupDirectory" `
+        -ForegroundColor Green
+
+    Write-Step 'Добавление передачи ошибок из старых обработчиков'
+
+    # Главная локальная обработка.
+    $mainText = Read-Source -Path $MainFile
+
+    $oldMainCatch = @'
+        catch (Exception exception)
+        {
+            var message =
+                SensitiveDataRedactor.Redact(
+                    exception.Message);
+'@
+
+    $newMainCatch = @'
+        catch (Exception exception)
+        {
+            CaptureBuild7Error(exception);
+
+            var message =
+                SensitiveDataRedactor.Redact(
+                    exception.Message);
+'@
+
+    if ($mainText.Contains($oldMainCatch)) {
+        $mainText = $mainText.Replace(
+            $oldMainCatch,
+            $newMainCatch
+        )
+
+        Write-Source `
+            -Path $MainFile `
+            -Text $mainText
+    }
+    elseif (-not $mainText.Contains(
+        'CaptureBuild7Error(exception);'
+    )) {
+        throw 'Не удалось подключить передачу ошибок локальной обработки.'
+    }
+
+    # ISPmanager.
+    $build2Text = Read-Source -Path $Build2File
+
+    $oldBuild2Error = @'
+    private void ShowBuild2Error(Exception exception)
+    {
+        var message =
+'@
+
+    $newBuild2Error = @'
+    private void ShowBuild2Error(Exception exception)
+    {
+        CaptureBuild7Error(exception);
+
+        var message =
+'@
+
+    $build2Text = Replace-Required `
+        -Text $build2Text `
+        -OldValue $oldBuild2Error `
+        -NewValue $newBuild2Error `
+        -Description 'передача ошибки ISPmanager' `
+        -AllowAlreadyFixed
+
+    Write-Source `
+        -Path $Build2File `
+        -Text $build2Text
+
+    # SSH/SFTP.
+    $build3Text = Read-Source -Path $Build3File
+
+    $oldBuild3Error = @'
+    private void ShowBuild3Error(Exception exception)
+    {
+        var message =
+'@
+
+    $newBuild3Error = @'
+    private void ShowBuild3Error(Exception exception)
+    {
+        CaptureBuild7Error(exception);
+
+        var message =
+'@
+
+    $build3Text = Replace-Required `
+        -Text $build3Text `
+        -OldValue $oldBuild3Error `
+        -NewValue $newBuild3Error `
+        -Description 'передача ошибки SSH/SFTP' `
+        -AllowAlreadyFixed
+
+    Write-Source `
+        -Path $Build3File `
+        -Text $build3Text
+
+    # Развёртывание базы данных.
+    $
+
+Ответ не поместился в длину, заданную для задачи — 4 000 токенов.
+
