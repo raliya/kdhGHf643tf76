@@ -1,0 +1,1517 @@
+ДАННЫЕ ДЛЯ ИСПРАВЛЕНИЯ BUILD7
+Создано: 2026-09-05 15:23:36
+Проект: C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка
+
+ОШИБКИ:
+1. ISPmanager: exists(name), база фактически создаётся.
+2. Spaceship: HTTP 422 — обязательны take и skip.
+3. После создания БД: код 41, проверка подключения не проходит.
+
+================================================================================
+ФАЙЛ: C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1
+СТРОКИ: 1-170
+================================================================================
+    1: #requires -Version 7.0
+    2: 
+    3: $ErrorActionPreference = 'Stop'
+    4: Set-StrictMode -Version Latest
+    5: 
+    6: $ProjectRoot = 'C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка'
+    7: $ProjectFile = Join-Path $ProjectRoot 'TextFileProcessor.csproj'
+    8: $MainWindowFile = Join-Path $ProjectRoot 'MainWindow.xaml.cs'
+    9: $DatabaseServiceFile = Join-Path $ProjectRoot 'Services\DatabaseDeploymentService.cs'
+   10: $Build7File = Join-Path $ProjectRoot 'MainWindow.Build7.cs'
+   11: $PublishDirectory = Join-Path $ProjectRoot 'publish\win-x64'
+   12: 
+   13: function Write-Step {
+   14:     param([string]$Text)
+   15:     Write-Host "`n=== $Text ===" -ForegroundColor Cyan
+   16: }
+   17: 
+   18: function Assert-File {
+   19:     param([string]$Path)
+   20: 
+   21:     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+   22:         throw "Файл не найден: $Path"
+   23:     }
+   24: }
+   25: 
+   26: Write-Step 'Проверка проекта'
+   27: 
+   28: Assert-File $ProjectFile
+   29: Assert-File $MainWindowFile
+   30: Assert-File $DatabaseServiceFile
+   31: 
+   32: $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+   33: if ($null -eq $dotnet) {
+   34:     throw 'Не найден dotnet. Установите .NET 8 SDK x64.'
+   35: }
+   36: 
+   37: $versionText = (& dotnet --version).Trim()
+   38: Write-Host ".NET SDK: $versionText"
+   39: 
+   40: if (-not $versionText.StartsWith('8.')) {
+   41:     Write-Warning "Проект рассчитан на .NET 8. Найдена версия SDK: $versionText"
+   42: }
+   43: 
+   44: Write-Step 'Создание резервной копии'
+   45: 
+   46: $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+   47: $backupRoot = Join-Path $ProjectRoot ".build7-backup-$timestamp"
+   48: 
+   49: New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
+   50: New-Item -ItemType Directory -Path (Join-Path $backupRoot 'Services') -Force | Out-Null
+   51: 
+   52: Copy-Item -LiteralPath $MainWindowFile `
+   53:     -Destination (Join-Path $backupRoot 'MainWindow.xaml.cs')
+   54: 
+   55: Copy-Item -LiteralPath $DatabaseServiceFile `
+   56:     -Destination (Join-Path $backupRoot 'Services\DatabaseDeploymentService.cs')
+   57: 
+   58: if (Test-Path -LiteralPath $Build7File) {
+   59:     Copy-Item -LiteralPath $Build7File `
+   60:         -Destination (Join-Path $backupRoot 'MainWindow.Build7.cs')
+   61: }
+   62: 
+   63: Write-Host "Резервная копия: $backupRoot"
+   64: 
+   65: Write-Step 'Исправление DatabaseDeploymentService'
+   66: 
+   67: $databaseText = Get-Content `
+   68:     -LiteralPath $DatabaseServiceFile `
+   69:     -Raw `
+   70:     -Encoding UTF8
+   71: 
+   72: $namePattern = @'
+   73: private static readonly Regex DatabaseNameRegex\s*=\s*new\([\s\S]*?RegexOptions\.CultureInvariant\);
+   74: '@
+   75: 
+   76: $nameReplacement = @'
+   77: private static readonly Regex DatabaseNameRegex = new(
+   78:         @"^[A-Za-z0-9_]{1,64}$",
+   79:         RegexOptions.Compiled |
+   80:         RegexOptions.CultureInvariant);
+   81: '@
+   82: 
+   83: $userPattern = @'
+   84: private static readonly Regex DatabaseUserRegex\s*=\s*new\([\s\S]*?RegexOptions\.CultureInvariant\);
+   85: '@
+   86: 
+   87: $userReplacement = @'
+   88: private static readonly Regex DatabaseUserRegex = new(
+   89:         @"^[A-Za-z0-9_]{1,64}$",
+   90:         RegexOptions.Compiled |
+   91:         RegexOptions.CultureInvariant);
+   92: '@
+   93: 
+   94: $databaseText = [regex]::Replace(
+   95:     $databaseText,
+   96:     $namePattern,
+   97:     $nameReplacement,
+   98:     [System.Text.RegularExpressions.RegexOptions]::Singleline)
+   99: 
+  100: $databaseText = [regex]::Replace(
+  101:     $databaseText,
+  102:     $userPattern,
+  103:     $userReplacement,
+  104:     [System.Text.RegularExpressions.RegexOptions]::Singleline)
+  105: 
+  106: # В старой реализации одинарные кавычки запрещали оболочке раскрыть
+  107: # $DB_PASSWORD. В ISPmanager передавалась буквальная строка
+  108: # "$DB_PASSWORD", а не реальный пароль.
+  109: $databaseText = $databaseText.Replace(
+  110:     "-e 'password=`$DB_PASSWORD' \",
+  111:     'password="[СКРЫТО]" \')
+  112: 
+  113: $databaseText = $databaseText.Replace(
+  114:     "-e 'confirm=`$DB_PASSWORD' \",
+  115:     'confirm="$DB_PASSWORD" \')
+  116: 
+  117: # На случай, если в локальном файле строки уже немного отличаются.
+  118: $databaseText = $databaseText.Replace(
+  119:     "'password=`$DB_PASSWORD'",
+  120:     '"password=$DB_PASSWORD"')
+  121: 
+  122: $databaseText = $databaseText.Replace(
+  123:     "'confirm=`$DB_PASSWORD'",
+  124:     '"confirm=$DB_PASSWORD"')
+  125: 
+  126: Set-Content `
+  127:     -LiteralPath $DatabaseServiceFile `
+  128:     -Value $databaseText `
+  129:     -Encoding UTF8
+  130: 
+  131: Write-Host 'Исправлены валидация имени БД и передача пароля в mgrctl.'
+  132: 
+  133: Write-Step 'Подключение Сборки 7'
+  134: 
+  135: $mainWindowText = Get-Content `
+  136:     -LiteralPath $MainWindowFile `
+  137:     -Raw `
+  138:     -Encoding UTF8
+  139: 
+  140: if ($mainWindowText -notmatch 'InitializeBuild7\s*\(') {
+  141:     if ($mainWindowText -match 'InitializeBuild6\s*\(\s*\)\s*;') {
+  142:         $mainWindowText = [regex]::Replace(
+  143:             $mainWindowText,
+  144:             'InitializeBuild6\s*\(\s*\)\s*;',
+  145:             "InitializeBuild6();`r`n        InitializeBuild7();",
+  146:             1)
+  147:     }
+  148:     else {
+  149:         $mainWindowText = $mainWindowText.Replace(
+  150:             'InitializeComponent();',
+  151:             "InitializeComponent();`r`n        InitializeBuild7();")
+  152:     }
+  153: 
+  154:     Set-Content `
+  155:         -LiteralPath $MainWindowFile `
+  156:         -Value $mainWindowText `
+  157:         -Encoding UTF8
+  158: }
+  159: 
+  160: Write-Step 'Создание MainWindow.Build7.cs'
+  161: 
+  162: $build7Source = @'
+  163: using System.Net;
+  164: using System.Net.Http;
+  165: using System.Security.Cryptography;
+  166: using System.Text;
+  167: using System.Text.Json;
+  168: using System.Windows;
+  169: using System.Windows.Controls;
+  170: using System.Windows.Media;
+
+================================================================================
+ФАЙЛ: C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1
+СТРОКИ: 780-930
+================================================================================
+  780:         }
+  781: 
+  782:         return Math.Clamp(
+  783:             completed * 100 / total,
+  784:             0,
+  785:             99);
+  786:     }
+  787: 
+  788:     private async Task TestSpaceshipForSelectedJobAsync()
+  789:     {
+  790:         var domain =
+  791:             _spaceshipDomainTextBox?.Text.Trim();
+  792: 
+  793:         if (string.IsNullOrWhiteSpace(domain))
+  794:         {
+  795:             domain = GetSelectedJob()?.Domain;
+  796:         }
+  797: 
+  798:         if (string.IsNullOrWhiteSpace(domain))
+  799:         {
+  800:             throw new InvalidOperationException(
+  801:                 "Укажите домен Spaceship или выберите задание.");
+  802:         }
+  803: 
+  804:         await TestSpaceshipAsync(domain);
+  805:     }
+  806: 
+  807:     private async Task TestSpaceshipAsync(string domain)
+  808:     {
+  809:         var settings = ReadSpaceshipSettings();
+  810: 
+  811:         if (string.IsNullOrWhiteSpace(settings.ApiSecret))
+  812:         {
+  813:             throw new InvalidOperationException(
+  814:                 "Введите или сохраните Spaceship API Secret.");
+  815:         }
+  816: 
+  817:         SaveSpaceshipSettings();
+  818: 
+  819:         var relativePath = settings.DnsPath
+  820:             .Replace(
+  821:                 "{domain}",
+  822:                 Uri.EscapeDataString(domain),
+  823:                 StringComparison.OrdinalIgnoreCase)
+  824:             .TrimStart('/');
+  825: 
+  826:         var baseUrl = settings.BaseUrl.TrimEnd('/');
+  827:         var requestUrl = baseUrl + "/" + relativePath;
+  828: 
+  829:         SetBuild7Status(
+  830:             _build7Progress?.Value ?? 0,
+  831:             $"Spaceship API: чтение DNS-зоны {domain}.");
+  832: 
+  833:         using var request = new HttpRequestMessage(
+  834:             HttpMethod.Get,
+  835:             requestUrl);
+  836: 
+  837:         request.Headers.TryAddWithoutValidation(
+  838:             "X-API-Key",
+  839:             settings.ApiKey);
+  840: 
+  841:         request.Headers.TryAddWithoutValidation(
+  842:             "X-API-Secret",
+  843:             settings.ApiSecret);
+  844: 
+  845:         using var response =
+  846:             await _spaceshipHttpClient.SendAsync(
+  847:                 request,
+  848:                 HttpCompletionOption.ResponseHeadersRead);
+  849: 
+  850:         var body = await response.Content.ReadAsStringAsync();
+  851: 
+  852:         if (!response.IsSuccessStatusCode)
+  853:         {
+  854:             var safeBody = LimitAndRedact(
+  855:                 body,
+  856:                 settings.ApiKey,
+  857:                 settings.ApiSecret);
+  858: 
+  859:             throw new InvalidOperationException(
+  860:                 $"Spaceship API вернул HTTP " +
+  861:                 $"{(int)response.StatusCode} " +
+  862:                 $"{response.ReasonPhrase}. {safeBody}");
+  863:         }
+  864: 
+  865:         var resultDescription = DescribeJson(body);
+  866: 
+  867:         SetBuild7Status(
+  868:             Math.Max(
+  869:                 1,
+  870:                 (int)(_build7Progress?.Value ?? 0)),
+  871:             $"Spaceship API доступен. Домен: {domain}. " +
+  872:             resultDescription);
+  873: 
+  874:         AddLog(
+  875:             "INFO",
+  876:             domain,
+  877:             "Spaceship API: DNS-зона успешно прочитана.");
+  878:     }
+  879: 
+  880:     private SpaceshipRuntimeSettings ReadSpaceshipSettings()
+  881:     {
+  882:         if (_spaceshipBaseUrlTextBox is null ||
+  883:             _spaceshipKeyTextBox is null ||
+  884:             _spaceshipSecretPasswordBox is null ||
+  885:             _spaceshipDnsPathTextBox is null)
+  886:         {
+  887:             throw new InvalidOperationException(
+  888:                 "Интерфейс Spaceship не инициализирован.");
+  889:         }
+  890: 
+  891:         var stored = LoadSpaceshipSettingsFile();
+  892: 
+  893:         var secret =
+  894:             _spaceshipSecretPasswordBox.Password;
+  895: 
+  896:         if (string.IsNullOrEmpty(secret) &&
+  897:             !string.IsNullOrWhiteSpace(stored.EncryptedSecret))
+  898:         {
+  899:             secret = UnprotectSecret(
+  900:                 stored.EncryptedSecret);
+  901:         }
+  902: 
+  903:         var settings = new SpaceshipRuntimeSettings
+  904:         {
+  905:             BaseUrl = _spaceshipBaseUrlTextBox.Text.Trim(),
+  906:             ApiKey = _spaceshipKeyTextBox.Text.Trim(),
+  907:             ApiSecret = secret,
+  908:             DnsPath = _spaceshipDnsPathTextBox.Text.Trim()
+  909:         };
+  910: 
+  911:         if (!Uri.TryCreate(
+  912:                 settings.BaseUrl,
+  913:                 UriKind.Absolute,
+  914:                 out var uri) ||
+  915:             uri.Scheme != Uri.UriSchemeHttps)
+  916:         {
+  917:             throw new InvalidOperationException(
+  918:                 "Spaceship Base URL должен быть абсолютным HTTPS URL.");
+  919:         }
+  920: 
+  921:         if (string.IsNullOrWhiteSpace(settings.ApiKey))
+  922:         {
+  923:             throw new InvalidOperationException(
+  924:                 "Не указан Spaceship API Key.");
+  925:         }
+  926: 
+  927:         if (string.IsNullOrWhiteSpace(settings.DnsPath) ||
+  928:             !settings.DnsPath.Contains(
+  929:                 "{domain}",
+  930:                 StringComparison.OrdinalIgnoreCase))
+
+================================================================================
+ФАЙЛ: C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\BUILD7.ps1
+СТРОКИ: 1180-1380
+================================================================================
+ 1180:     private void SetBuild7ButtonsEnabled(bool enabled)
+ 1181:     {
+ 1182:         if (_build7LocalButton is not null)
+ 1183:             _build7LocalButton.IsEnabled = enabled;
+ 1184: 
+ 1185:         if (_build7DomainButton is not null)
+ 1186:             _build7DomainButton.IsEnabled = enabled;
+ 1187: 
+ 1188:         if (_build7UploadButton is not null)
+ 1189:             _build7UploadButton.IsEnabled = enabled;
+ 1190: 
+ 1191:         if (_build7DatabaseButton is not null)
+ 1192:             _build7DatabaseButton.IsEnabled = enabled;
+ 1193: 
+ 1194:         if (_build7SpaceshipButton is not null)
+ 1195:             _build7SpaceshipButton.IsEnabled = enabled;
+ 1196: 
+ 1197:         if (_build7AllButton is not null)
+ 1198:             _build7AllButton.IsEnabled = enabled;
+ 1199:     }
+ 1200: 
+ 1201:     private void ShowBuild7Error(
+ 1202:         string domain,
+ 1203:         Exception exception)
+ 1204:     {
+ 1205:         var message = SensitiveDataRedactor.Redact(
+ 1206:             exception.Message);
+ 1207: 
+ 1208:         SetBuild7Status(
+ 1209:             _build7Progress?.Value ?? 0,
+ 1210:             message);
+ 1211: 
+ 1212:         AddLog(
+ 1213:             "ERROR",
+ 1214:             domain,
+ 1215:             message);
+ 1216: 
+ 1217:         MessageBox.Show(
+ 1218:             this,
+ 1219:             message,
+ 1220:             "Ошибка процесса",
+ 1221:             MessageBoxButton.OK,
+ 1222:             MessageBoxImage.Error);
+ 1223:     }
+ 1224: 
+ 1225:     private static TextBox AddTextSetting(
+ 1226:         Grid grid,
+ 1227:         int row,
+ 1228:         string label,
+ 1229:         string defaultValue)
+ 1230:     {
+ 1231:         AddLabel(grid, row, label);
+ 1232: 
+ 1233:         var textBox = new TextBox
+ 1234:         {
+ 1235:             Text = defaultValue,
+ 1236:             Margin = new Thickness(0, 0, 0, 8)
+ 1237:         };
+ 1238: 
+ 1239:         Grid.SetRow(textBox, row);
+ 1240:         Grid.SetColumn(textBox, 1);
+ 1241:         grid.Children.Add(textBox);
+ 1242: 
+ 1243:         return textBox;
+ 1244:     }
+ 1245: 
+ 1246:     private static void AddLabel(
+ 1247:         Grid grid,
+ 1248:         int row,
+ 1249:         string text)
+ 1250:     {
+ 1251:         var label = new TextBlock
+ 1252:         {
+ 1253:             Text = text,
+ 1254:             VerticalAlignment = VerticalAlignment.Center,
+ 1255:             Margin = new Thickness(0, 0, 10, 8)
+ 1256:         };
+ 1257: 
+ 1258:         Grid.SetRow(label, row);
+ 1259:         Grid.SetColumn(label, 0);
+ 1260:         grid.Children.Add(label);
+ 1261:     }
+ 1262: 
+ 1263:     private static T? FindVisualChild<T>(
+ 1264:         DependencyObject parent)
+ 1265:         where T : DependencyObject
+ 1266:     {
+ 1267:         var count = VisualTreeHelper.GetChildrenCount(parent);
+ 1268: 
+ 1269:         for (var index = 0; index < count; index++)
+ 1270:         {
+ 1271:             var child = VisualTreeHelper.GetChild(
+ 1272:                 parent,
+ 1273:                 index);
+ 1274: 
+ 1275:             if (child is T result)
+ 1276:             {
+ 1277:                 return result;
+ 1278:             }
+ 1279: 
+ 1280:             var nested = FindVisualChild<T>(child);
+ 1281: 
+ 1282:             if (nested is not null)
+ 1283:             {
+ 1284:                 return nested;
+ 1285:             }
+ 1286:         }
+ 1287: 
+ 1288:         return null;
+ 1289:     }
+ 1290: 
+ 1291:     private static string SpaceshipSettingsPath =>
+ 1292:         Path.Combine(
+ 1293:             Environment.GetFolderPath(
+ 1294:                 Environment.SpecialFolder.LocalApplicationData),
+ 1295:             "TextFileProcessor",
+ 1296:             "spaceship-settings.json");
+ 1297: 
+ 1298:     private static readonly byte[] SpaceshipEntropy =
+ 1299:         Encoding.UTF8.GetBytes(
+ 1300:             "TextFileProcessor.Spaceship.Build7.v1");
+ 1301: 
+ 1302:     private sealed class SpaceshipRuntimeSettings
+ 1303:     {
+ 1304:         public string BaseUrl { get; init; } =
+ 1305:             "https://spaceship.dev/api/v1";
+ 1306: 
+ 1307:         public string ApiKey { get; init; } = string.Empty;
+ 1308: 
+ 1309:         public string ApiSecret { get; init; } = string.Empty;
+ 1310: 
+ 1311:         public string DnsPath { get; init; } =
+ 1312:             "dns/records/{domain}";
+ 1313:     }
+ 1314: 
+ 1315:     private sealed class SpaceshipStoredSettings
+ 1316:     {
+ 1317:         public string BaseUrl { get; set; } =
+ 1318:             "https://spaceship.dev/api/v1";
+ 1319: 
+ 1320:         public string ApiKey { get; set; } = string.Empty;
+ 1321: 
+ 1322:         public string EncryptedSecret { get; set; } =
+ 1323:             string.Empty;
+ 1324: 
+ 1325:         public string DnsPath { get; set; } =
+ 1326:             "dns/records/{domain}";
+ 1327:     }
+ 1328: }
+ 1329: '@
+ 1330: 
+ 1331: Set-Content `
+ 1332:     -LiteralPath $Build7File `
+ 1333:     -Value $build7Source `
+ 1334:     -Encoding UTF8
+ 1335: 
+ 1336: Write-Host "Создан: $Build7File"
+ 1337: 
+ 1338: Write-Step 'Очистка старой сборки'
+ 1339: 
+ 1340: Push-Location $ProjectRoot
+ 1341: 
+ 1342: try {
+ 1343:     if (Test-Path -LiteralPath (Join-Path $ProjectRoot 'bin')) {
+ 1344:         Remove-Item `
+ 1345:             -LiteralPath (Join-Path $ProjectRoot 'bin') `
+ 1346:             -Recurse `
+ 1347:             -Force
+ 1348:     }
+ 1349: 
+ 1350:     if (Test-Path -LiteralPath (Join-Path $ProjectRoot 'obj')) {
+ 1351:         Remove-Item `
+ 1352:             -LiteralPath (Join-Path $ProjectRoot 'obj') `
+ 1353:             -Recurse `
+ 1354:             -Force
+ 1355:     }
+ 1356: 
+ 1357:     if (Test-Path -LiteralPath $PublishDirectory) {
+ 1358:         Remove-Item `
+ 1359:             -LiteralPath $PublishDirectory `
+ 1360:             -Recurse `
+ 1361:             -Force
+ 1362:     }
+ 1363: 
+ 1364:     Write-Step 'Восстановление NuGet-пакетов'
+ 1365: 
+ 1366:     & dotnet restore $ProjectFile `
+ 1367:         --runtime win-x64
+ 1368: 
+ 1369:     if ($LASTEXITCODE -ne 0) {
+ 1370:         throw "dotnet restore завершился с кодом $LASTEXITCODE"
+ 1371:     }
+ 1372: 
+ 1373:     Write-Step 'Проверочная сборка Release x64'
+ 1374: 
+ 1375:     & dotnet build $ProjectFile `
+ 1376:         --configuration Release `
+ 1377:         --runtime win-x64 `
+ 1378:         --no-restore
+ 1379: 
+ 1380:     if ($LASTEXITCODE -ne 0) {
+
+================================================================================
+ФАЙЛ: C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\Services\DatabaseDeploymentService.cs
+СТРОКИ: 1-520
+================================================================================
+    1: using System.Security.Cryptography;
+    2: using System.Text;
+    3: using System.Text.RegularExpressions;
+    4: using Renci.SshNet;
+    5: using Renci.SshNet.Common;
+    6: using TextFileProcessor.Models;
+    7: 
+    8: namespace TextFileProcessor.Services;
+    9: 
+   10: public sealed record DatabaseDeploymentProgress(
+   11:     int Percent,
+   12:     string Message);
+   13: 
+   14: public sealed class DatabaseDeploymentResult
+   15: {
+   16:     public string DatabaseName { get; init; } = string.Empty;
+   17: 
+   18:     public string DatabaseUser { get; init; } = string.Empty;
+   19: 
+   20:     public string SqlFile { get; init; } = string.Empty;
+   21: 
+   22:     public bool DatabaseWasCreated { get; init; }
+   23: }
+   24: 
+   25: public sealed class DatabaseDeploymentService
+   26: {
+   27:     private static readonly Regex DatabaseNameRegex = new(
+   28:         @"^[A-Za-z0-9_]{1,64}$",
+   29:         RegexOptions.Compiled |
+   30:         RegexOptions.CultureInvariant);
+   31: 
+   32:     private static readonly Regex DatabaseUserRegex = new(
+   33:         @"^[A-Za-z0-9_]{1,64}$",
+   34:         RegexOptions.Compiled |
+   35:         RegexOptions.CultureInvariant);
+   36: 
+   37:     public async Task<DatabaseDeploymentResult> DeployAsync(
+   38:         SshDeploymentSettings settings,
+   39:         string sshPassword,
+   40:         string localSiteDirectory,
+   41:         IProgress<DatabaseDeploymentProgress>? progress,
+   42:         CancellationToken cancellationToken)
+   43:     {
+   44:         settings.Validate(sshPassword);
+   45: 
+   46:         if (string.IsNullOrWhiteSpace(localSiteDirectory))
+   47:         {
+   48:             throw new InvalidOperationException(
+   49:                 "Не указана локальная папка сайта.");
+   50:         }
+   51: 
+   52:         var siteDirectory = Path.GetFullPath(
+   53:             localSiteDirectory);
+   54: 
+   55:         if (!Directory.Exists(siteDirectory))
+   56:         {
+   57:             throw new DirectoryNotFoundException(
+   58:                 $"Локальная папка сайта не найдена: {siteDirectory}");
+   59:         }
+   60: 
+   61:         var configPath = Path.Combine(
+   62:             siteDirectory,
+   63:             "config",
+   64:             "config.php");
+   65: 
+   66:         if (!File.Exists(configPath))
+   67:         {
+   68:             throw new FileNotFoundException(
+   69:                 "Не найден обработанный config.php.",
+   70:                 configPath);
+   71:         }
+   72: 
+   73:         progress?.Report(
+   74:             new DatabaseDeploymentProgress(
+   75:                 5,
+   76:                 "Чтение реквизитов из config.php."));
+   77: 
+   78:         var configText = await File.ReadAllTextAsync(
+   79:             configPath,
+   80:             cancellationToken);
+   81: 
+   82:         var databaseName = ReadPhpValue(
+   83:             configText,
+   84:             "name");
+   85: 
+   86:         var databaseUser = ReadPhpValue(
+   87:             configText,
+   88:             "user");
+   89: 
+   90:         var databasePassword = ReadPhpValue(
+   91:             configText,
+   92:             "pass");
+   93: 
+   94:         ValidateDatabaseCredentials(
+   95:             databaseName,
+   96:             databaseUser,
+   97:             databasePassword);
+   98: 
+   99:         var sqlFile = FindSqlFile(siteDirectory);
+  100: 
+  101:         if (new FileInfo(sqlFile).Length == 0)
+  102:         {
+  103:             throw new InvalidOperationException(
+  104:                 $"SQL-файл пуст: {sqlFile}");
+  105:         }
+  106: 
+  107:         progress?.Report(
+  108:             new DatabaseDeploymentProgress(
+  109:                 10,
+  110:                 $"Найден SQL-файл: {Path.GetFileName(sqlFile)}"));
+  111: 
+  112:         return await Task.Run(
+  113:             () => DeployCore(
+  114:                 settings,
+  115:                 sshPassword,
+  116:                 databaseName,
+  117:                 databaseUser,
+  118:                 databasePassword,
+  119:                 sqlFile,
+  120:                 progress,
+  121:                 cancellationToken),
+  122:             cancellationToken);
+  123:     }
+  124: 
+  125:     private static DatabaseDeploymentResult DeployCore(
+  126:         SshDeploymentSettings settings,
+  127:         string sshPassword,
+  128:         string databaseName,
+  129:         string databaseUser,
+  130:         string databasePassword,
+  131:         string sqlFile,
+  132:         IProgress<DatabaseDeploymentProgress>? progress,
+  133:         CancellationToken cancellationToken)
+  134:     {
+  135:         var operationId =
+  136:             Guid.NewGuid().ToString("N");
+  137: 
+  138:         var remoteDirectory =
+  139:             $"/tmp/text-file-processor-db-{operationId}";
+  140: 
+  141:         var remoteSql =
+  142:             $"{remoteDirectory}/database.sql";
+  143: 
+  144:         var remoteSecret =
+  145:             $"{remoteDirectory}/database-password";
+  146: 
+  147:         var remoteScript =
+  148:             $"{remoteDirectory}/run.sh";
+  149: 
+  150:         using var ssh = CreateSshClient(
+  151:             settings,
+  152:             sshPassword);
+  153: 
+  154:         using var sftp = CreateSftpClient(
+  155:             settings,
+  156:             sshPassword);
+  157: 
+  158:         var temporaryDirectoryCreated = false;
+  159: 
+  160:         try
+  161:         {
+  162:             cancellationToken.ThrowIfCancellationRequested();
+  163: 
+  164:             progress?.Report(
+  165:                 new DatabaseDeploymentProgress(
+  166:                     15,
+  167:                     "Подключение к SSH/SFTP."));
+  168: 
+  169:             ssh.Connect();
+  170:             sftp.Connect();
+  171: 
+  172:             cancellationToken.ThrowIfCancellationRequested();
+  173: 
+  174:             RunChecked(
+  175:                 ssh,
+  176:                 "umask 077; mkdir -- " +
+  177:                 ShellQuote(remoteDirectory));
+  178: 
+  179:             temporaryDirectoryCreated = true;
+  180: 
+  181:             progress?.Report(
+  182:                 new DatabaseDeploymentProgress(
+  183:                     25,
+  184:                     "Загрузка SQL во временный закрытый каталог."));
+  185: 
+  186:             using (var sqlStream = new FileStream(
+  187:                        sqlFile,
+  188:                        FileMode.Open,
+  189:                        FileAccess.Read,
+  190:                        FileShare.Read,
+  191:                        1024 * 1024,
+  192:                        FileOptions.SequentialScan))
+  193:             {
+  194:                 var sqlLength = sqlStream.Length;
+  195: 
+  196:                 sftp.UploadFile(
+  197:                     sqlStream,
+  198:                     remoteSql,
+  199:                     true,
+  200:                     uploaded =>
+  201:                     {
+  202:                         var percent = sqlLength > 0
+  203:                             ? 25 + (int)Math.Min(
+  204:                                 35UL,
+  205:                                 uploaded * 35UL /
+  206:                                 (ulong)sqlLength)
+  207:                             : 60;
+  208: 
+  209:                         progress?.Report(
+  210:                             new DatabaseDeploymentProgress(
+  211:                                 percent,
+  212:                                 "Загрузка SQL: " +
+  213:                                 uploaded +
+  214:                                 " из " +
+  215:                                 sqlLength +
+  216:                                 " байт."));
+  217:                     });
+  218:             }
+  219: 
+  220:             cancellationToken.ThrowIfCancellationRequested();
+  221: 
+  222:             using (var secretStream = new MemoryStream(
+  223:                        new UTF8Encoding(false).GetBytes(
+  224:                            databasePassword)))
+  225:             {
+  226:                 sftp.UploadFile(
+  227:                     secretStream,
+  228:                     remoteSecret,
+  229:                     true);
+  230:             }
+  231: 
+  232:             var scriptText = CreateRemoteScript(
+  233:                 databaseName,
+  234:                 databaseUser,
+  235:                 settings.Owner,
+  236:                 remoteSql,
+  237:                 remoteSecret);
+  238: 
+  239:             using (var scriptStream = new MemoryStream(
+  240:                        new UTF8Encoding(false).GetBytes(
+  241:                            scriptText)))
+  242:             {
+  243:                 sftp.UploadFile(
+  244:                     scriptStream,
+  245:                     remoteScript,
+  246:                     true);
+  247:             }
+  248: 
+  249:             RunChecked(
+  250:                 ssh,
+  251:                 "chmod 700 -- " +
+  252:                 ShellQuote(remoteDirectory) +
+  253:                 " && chmod 600 -- " +
+  254:                 ShellQuote(remoteSql) +
+  255:                 " " +
+  256:                 ShellQuote(remoteSecret) +
+  257:                 " " +
+  258:                 ShellQuote(remoteScript));
+  259: 
+  260:             progress?.Report(
+  261:                 new DatabaseDeploymentProgress(
+  262:                     65,
+  263:                     "Проверка БД и создание при необходимости."));
+  264: 
+  265:             cancellationToken.ThrowIfCancellationRequested();
+  266: 
+  267:             var output = RunChecked(
+  268:                 ssh,
+  269:                 "/bin/sh " +
+  270:                 ShellQuote(remoteScript));
+  271: 
+  272:             var databaseWasCreated =
+  273:                 output.Contains(
+  274:                     "DATABASE_CREATED",
+  275:                     StringComparison.Ordinal);
+  276: 
+  277:             if (!output.Contains(
+  278:                     "SQL_IMPORT_OK",
+  279:                     StringComparison.Ordinal))
+  280:             {
+  281:                 throw new InvalidOperationException(
+  282:                     "Сервер не подтвердил успешный импорт SQL.");
+  283:             }
+  284: 
+  285:             progress?.Report(
+  286:                 new DatabaseDeploymentProgress(
+  287:                     100,
+  288:                     "База данных готова, SQL импортирован."));
+  289: 
+  290:             return new DatabaseDeploymentResult
+  291:             {
+  292:                 DatabaseName = databaseName,
+  293:                 DatabaseUser = databaseUser,
+  294:                 SqlFile = sqlFile,
+  295:                 DatabaseWasCreated = databaseWasCreated
+  296:             };
+  297:         }
+  298:         catch (Exception exception)
+  299:         {
+  300:             var safeMessage = exception.Message.Replace(
+  301:                 databasePassword,
+  302:                 "[СКРЫТО]",
+  303:                 StringComparison.Ordinal);
+  304: 
+  305:             throw new InvalidOperationException(
+  306:                 safeMessage,
+  307:                 exception);
+  308:         }
+  309:         finally
+  310:         {
+  311:             if (temporaryDirectoryCreated &&
+  312:                 ssh.IsConnected)
+  313:             {
+  314:                 TryRun(
+  315:                     ssh,
+  316:                     "rm -rf -- " +
+  317:                     ShellQuote(remoteDirectory));
+  318:             }
+  319: 
+  320:             if (sftp.IsConnected)
+  321:             {
+  322:                 sftp.Disconnect();
+  323:             }
+  324: 
+  325:             if (ssh.IsConnected)
+  326:             {
+  327:                 ssh.Disconnect();
+  328:             }
+  329:         }
+  330:     }
+  331: 
+  332:     private static string CreateRemoteScript(
+  333:         string databaseName,
+  334:         string databaseUser,
+  335:         string owner,
+  336:         string remoteSql,
+  337:         string remoteSecret)
+  338:     {
+  339:         return
+  340: $"""
+  341: #!/bin/sh
+  342: set -u
+  343: 
+  344: DATABASE_NAME={ShellQuote(databaseName)}
+  345: DATABASE_USER={ShellQuote(databaseUser)}
+  346: DATABASE_OWNER={ShellQuote(owner)}
+  347: REMOTE_SQL={ShellQuote(remoteSql)}
+  348: SECRET_FILE={ShellQuote(remoteSecret)}
+  349: 
+  350: if [ ! -f "$REMOTE_SQL" ]; then
+  351:     echo "SQL-файл не найден." >&2
+  352:     exit 31
+  353: fi
+  354: 
+  355: if [ ! -f "$SECRET_FILE" ]; then
+  356:     echo "Файл реквизитов не найден." >&2
+  357:     exit 32
+  358: fi
+  359: 
+  360: DB_PASSWORD="[СКРЫТО]"$SECRET_FILE")"
+  361: 
+  362: if [ -z "$DB_PASSWORD" ]; then
+  363:     echo "Пароль базы данных пуст." >&2
+  364:     exit 33
+  365: fi
+  366: 
+  367: export MYSQL_PWD="$DB_PASSWORD"
+  368: export DB_PASSWORD
+  369: 
+  370: if command -v mariadb >/dev/null 2>&1; then
+  371:     DB_CLIENT="mariadb"
+  372: elif command -v mysql >/dev/null 2>&1; then
+  373:     DB_CLIENT="mysql"
+  374: else
+  375:     echo "Не найден клиент mariadb или mysql." >&2
+  376:     exit 34
+  377: fi
+  378: 
+  379: DATABASE_CREATED=0
+  380: 
+  381: if "$DB_CLIENT" \
+  382:     --user="$DATABASE_USER" \
+  383:     --database="$DATABASE_NAME" \
+  384:     --execute="SELECT 1" \
+  385:     >/dev/null 2>&1
+  386: then
+  387:     echo "DATABASE_ALREADY_AVAILABLE"
+  388: else
+  389:     CREATE_OUTPUT="$(
+  390:         /usr/local/mgr5/sbin/mgrctl \
+  391:             -m ispmgr \
+  392:             db.edit \
+  393:             name="$DATABASE_NAME" \
+  394:             owner="$DATABASE_OWNER" \
+  395:             server="MySQL" \
+  396:             charset="utf8mb4" \
+  397:             user="*" \
+  398:             username="$DATABASE_USER" \
+  399:             password="[СКРЫТО]" \
+  400:             confirm="$DB_PASSWORD" \
+  401:             hide_remote_access=on \
+  402:             remote_access=off \
+  403:             sok=ok 2>&1
+  404:     )"
+  405: 
+  406:     CREATE_STATUS=$?
+  407: 
+  408:     if [ "$CREATE_STATUS" -ne 0 ]; then
+  409:         printf '%s\n' "$CREATE_OUTPUT" >&2
+  410:         echo "ISPmanager не создал базу данных." >&2
+  411:         exit "$CREATE_STATUS"
+  412:     fi
+  413: 
+  414:     DATABASE_CREATED=1
+  415:     echo "DATABASE_CREATED"
+  416: 
+  417:     if ! "$DB_CLIENT" \
+  418:         --user="$DATABASE_USER" \
+  419:         --database="$DATABASE_NAME" \
+  420:         --execute="SELECT 1" \
+  421:         >/dev/null 2>&1
+  422:     then
+  423:         echo "Созданная БД не прошла проверку подключения." >&2
+  424:         exit 41
+  425:     fi
+  426: fi
+  427: 
+  428: "$DB_CLIENT" \
+  429:     --default-character-set=utf8mb4 \
+  430:     --user="$DATABASE_USER" \
+  431:     --database="$DATABASE_NAME" \
+  432:     < "$REMOTE_SQL"
+  433: 
+  434: IMPORT_STATUS=$?
+  435: 
+  436: unset MYSQL_PWD
+  437: unset DB_PASSWORD
+  438: DB_PASSWORD=""
+  439: 
+  440: if [ "$IMPORT_STATUS" -ne 0 ]; then
+  441:     echo "Ошибка импорта SQL. Код: $IMPORT_STATUS" >&2
+  442:     exit "$IMPORT_STATUS"
+  443: fi
+  444: 
+  445: echo "SQL_IMPORT_OK"
+  446: exit 0
+  447: """;
+  448:     }
+  449: 
+  450:     private static string ReadPhpValue(
+  451:         string configText,
+  452:         string key)
+  453:     {
+  454:         var pattern =
+  455:             @"[""']" +
+  456:             Regex.Escape(key) +
+  457:             @"[""']\s*=>\s*" +
+  458:             @"(?<quote>[""'])" +
+  459:             @"(?<value>(?:\\.|(?!\k<quote>).)*)" +
+  460:             @"\k<quote>";
+  461: 
+  462:         var match = Regex.Match(
+  463:             configText,
+  464:             pattern,
+  465:             RegexOptions.CultureInvariant |
+  466:             RegexOptions.Singleline);
+  467: 
+  468:         if (!match.Success)
+  469:         {
+  470:             throw new InvalidOperationException(
+  471:                 $"В config.php не найден параметр '{key}'.");
+  472:         }
+  473: 
+  474:         var value = match
+  475:             .Groups["value"]
+  476:             .Value;
+  477: 
+  478:         value = Regex.Replace(
+  479:             value,
+  480:             @"\\(['""\\])",
+  481:             "$1");
+  482: 
+  483:         if (string.IsNullOrWhiteSpace(value))
+  484:         {
+  485:             throw new InvalidOperationException(
+  486:                 $"Параметр '{key}' в config.php пуст.");
+  487:         }
+  488: 
+  489:         return value;
+  490:     }
+  491: 
+  492:     private static void ValidateDatabaseCredentials(
+  493:         string databaseName,
+  494:         string databaseUser,
+  495:         string databasePassword)
+  496:     {
+  497:         if (!DatabaseNameRegex.IsMatch(databaseName))
+  498:         {
+  499:             throw new InvalidOperationException(
+  500:                 $"Некорректное имя БД: {databaseName}");
+  501:         }
+  502: 
+  503:         if (!DatabaseUserRegex.IsMatch(databaseUser))
+  504:         {
+  505:             throw new InvalidOperationException(
+  506:                 $"Некорректный пользователь БД: {databaseUser}");
+  507:         }
+  508: 
+  509:         if (databasePassword.Length > 1024 ||
+  510:             databasePassword.Contains('\0') ||
+  511:             databasePassword.Contains('\r') ||
+  512:             databasePassword.Contains('\n'))
+  513:         {
+  514:             throw new InvalidOperationException(
+  515:                 "Пароль БД имеет недопустимый формат.");
+  516:         }
+  517:     }
+  518: 
+  519:     private static string FindSqlFile(
+  520:         string siteDirectory)
+
+================================================================================
+ФАЙЛ: C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build7.cs
+СТРОКИ: 620-780
+================================================================================
+  620:         return Math.Clamp(
+  621:             completed * 100 / total,
+  622:             0,
+  623:             99);
+  624:     }
+  625: 
+  626:     private async Task TestSpaceshipForSelectedJobAsync()
+  627:     {
+  628:         var domain =
+  629:             _spaceshipDomainTextBox?.Text.Trim();
+  630: 
+  631:         if (string.IsNullOrWhiteSpace(domain))
+  632:         {
+  633:             domain = GetSelectedJob()?.Domain;
+  634:         }
+  635: 
+  636:         if (string.IsNullOrWhiteSpace(domain))
+  637:         {
+  638:             throw new InvalidOperationException(
+  639:                 "Укажите домен Spaceship или выберите задание.");
+  640:         }
+  641: 
+  642:         await TestSpaceshipAsync(domain);
+  643:     }
+  644: 
+  645:     private async Task TestSpaceshipAsync(string domain)
+  646:     {
+  647:         var settings = ReadSpaceshipSettings();
+  648: 
+  649:         if (string.IsNullOrWhiteSpace(settings.ApiSecret))
+  650:         {
+  651:             throw new InvalidOperationException(
+  652:                 "Введите или сохраните Spaceship API Secret.");
+  653:         }
+  654: 
+  655:         SaveSpaceshipSettings();
+  656: 
+  657:         var relativePath = settings.DnsPath
+  658:             .Replace(
+  659:                 "{domain}",
+  660:                 Uri.EscapeDataString(domain),
+  661:                 StringComparison.OrdinalIgnoreCase)
+  662:             .TrimStart('/');
+  663: 
+  664:         var baseUrl = settings.BaseUrl.TrimEnd('/');
+  665:         var requestUrl = baseUrl + "/" + relativePath;
+  666: 
+  667:         SetBuild7Status(
+  668:             _build7Progress?.Value ?? 0,
+  669:             $"Spaceship API: чтение DNS-зоны {domain}.");
+  670: 
+  671:         using var request = new HttpRequestMessage(
+  672:             HttpMethod.Get,
+  673:             requestUrl);
+  674: 
+  675:         request.Headers.TryAddWithoutValidation(
+  676:             "X-API-Key",
+  677:             settings.ApiKey);
+  678: 
+  679:         request.Headers.TryAddWithoutValidation(
+  680:             "X-API-Secret",
+  681:             settings.ApiSecret);
+  682: 
+  683:         using var response =
+  684:             await _spaceshipHttpClient.SendAsync(
+  685:                 request,
+  686:                 HttpCompletionOption.ResponseHeadersRead);
+  687: 
+  688:         var body = await response.Content.ReadAsStringAsync();
+  689: 
+  690:         if (!response.IsSuccessStatusCode)
+  691:         {
+  692:             var safeBody = LimitAndRedact(
+  693:                 body,
+  694:                 settings.ApiKey,
+  695:                 settings.ApiSecret);
+  696: 
+  697:             throw new InvalidOperationException(
+  698:                 $"Spaceship API вернул HTTP " +
+  699:                 $"{(int)response.StatusCode} " +
+  700:                 $"{response.ReasonPhrase}. {safeBody}");
+  701:         }
+  702: 
+  703:         var resultDescription = DescribeJson(body);
+  704: 
+  705:         SetBuild7Status(
+  706:             Math.Max(
+  707:                 1,
+  708:                 (int)(_build7Progress?.Value ?? 0)),
+  709:             $"Spaceship API доступен. Домен: {domain}. " +
+  710:             resultDescription);
+  711: 
+  712:         AddLog(
+  713:             "INFO",
+  714:             domain,
+  715:             "Spaceship API: DNS-зона успешно прочитана.");
+  716:     }
+  717: 
+  718:     private SpaceshipRuntimeSettings ReadSpaceshipSettings()
+  719:     {
+  720:         if (_spaceshipBaseUrlTextBox is null ||
+  721:             _spaceshipKeyTextBox is null ||
+  722:             _spaceshipSecretPasswordBox is null ||
+  723:             _spaceshipDnsPathTextBox is null)
+  724:         {
+  725:             throw new InvalidOperationException(
+  726:                 "Интерфейс Spaceship не инициализирован.");
+  727:         }
+  728: 
+  729:         var stored = LoadSpaceshipSettingsFile();
+  730: 
+  731:         var secret =
+  732:             _spaceshipSecretPasswordBox.Password;
+  733: 
+  734:         if (string.IsNullOrEmpty(secret) &&
+  735:             !string.IsNullOrWhiteSpace(stored.EncryptedSecret))
+  736:         {
+  737:             secret = UnprotectSecret(
+  738:                 stored.EncryptedSecret);
+  739:         }
+  740: 
+  741:         var settings = new SpaceshipRuntimeSettings
+  742:         {
+  743:             BaseUrl = _spaceshipBaseUrlTextBox.Text.Trim(),
+  744:             ApiKey = _spaceshipKeyTextBox.Text.Trim(),
+  745:             ApiSecret = secret,
+  746:             DnsPath = _spaceshipDnsPathTextBox.Text.Trim()
+  747:         };
+  748: 
+  749:         if (!Uri.TryCreate(
+  750:                 settings.BaseUrl,
+  751:                 UriKind.Absolute,
+  752:                 out var uri) ||
+  753:             uri.Scheme != Uri.UriSchemeHttps)
+  754:         {
+  755:             throw new InvalidOperationException(
+  756:                 "Spaceship Base URL должен быть абсолютным HTTPS URL.");
+  757:         }
+  758: 
+  759:         if (string.IsNullOrWhiteSpace(settings.ApiKey))
+  760:         {
+  761:             throw new InvalidOperationException(
+  762:                 "Не указан Spaceship API Key.");
+  763:         }
+  764: 
+  765:         if (string.IsNullOrWhiteSpace(settings.DnsPath) ||
+  766:             !settings.DnsPath.Contains(
+  767:                 "{domain}",
+  768:                 StringComparison.OrdinalIgnoreCase))
+  769:         {
+  770:             throw new InvalidOperationException(
+  771:                 "DNS path должен содержать {domain}.");
+  772:         }
+  773: 
+  774:         return settings;
+  775:     }
+  776: 
+  777:     private void SaveSpaceshipSettings()
+  778:     {
+  779:         var settings = ReadSpaceshipSettings();
+  780: 
+
+================================================================================
+ФАЙЛ: C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\MainWindow.Build4.cs
+СТРОКИ: 1-240
+================================================================================
+    1: using System.Windows;
+    2: using TextFileProcessor.Models;
+    3: using TextFileProcessor.Services;
+    4: 
+    5: namespace TextFileProcessor;
+    6: 
+    7: public partial class MainWindow
+    8: {
+    9:     private readonly DatabaseDeploymentService
+   10:         _databaseDeploymentService = new();
+   11: 
+   12:     private void Build4_Loaded(
+   13:         object sender,
+   14:         RoutedEventArgs e)
+   15:     {
+   16:         Build3_Loaded(sender, e);
+   17: 
+   18:         Build4StatusTextBlock.Text =
+   19:             "Выберите готовое задание, затем создайте БД " +
+   20:             "и импортируйте SQL.";
+   21:     }
+   22: 
+   23:     private async void DeployDatabaseButton_Click(
+   24:         object sender,
+   25:         RoutedEventArgs e)
+   26:     {
+   27:         if (_isRunning)
+   28:         {
+   29:             return;
+   30:         }
+   31: 
+   32:         var selectedJob =
+   33:             JobsGrid.SelectedItem as DomainJob;
+   34: 
+   35:         if (selectedJob is null)
+   36:         {
+   37:             MessageBox.Show(
+   38:                 this,
+   39:                 "Сначала выберите домен в таблице «Задания».",
+   40:                 "Сборка 4 — база данных",
+   41:                 MessageBoxButton.OK,
+   42:                 MessageBoxImage.Information);
+   43: 
+   44:             return;
+   45:         }
+   46: 
+   47:         if (string.IsNullOrWhiteSpace(
+   48:                 selectedJob.OutputPath) ||
+   49:             !Directory.Exists(selectedJob.OutputPath))
+   50:         {
+   51:             MessageBox.Show(
+   52:                 this,
+   53:                 "У выбранного задания отсутствует готовая " +
+   54:                 "локальная папка.",
+   55:                 "Сборка 4 — база данных",
+   56:                 MessageBoxButton.OK,
+   57:                 MessageBoxImage.Warning);
+   58: 
+   59:             return;
+   60:         }
+   61: 
+   62:         var configPath = Path.Combine(
+   63:             selectedJob.OutputPath,
+   64:             "config",
+   65:             "config.php");
+   66: 
+   67:         if (!File.Exists(configPath))
+   68:         {
+   69:             MessageBox.Show(
+   70:                 this,
+   71:                 "Не найден обработанный файл:\n" +
+   72:                 configPath,
+   73:                 "Сборка 4 — база данных",
+   74:                 MessageBoxButton.OK,
+   75:                 MessageBoxImage.Warning);
+   76: 
+   77:             return;
+   78:         }
+   79: 
+   80:         var sqlFiles = Directory
+   81:             .EnumerateFiles(
+   82:                 selectedJob.OutputPath,
+   83:                 "*.sql",
+   84:                 SearchOption.AllDirectories)
+   85:             .ToList();
+   86: 
+   87:         if (sqlFiles.Count == 0)
+   88:         {
+   89:             MessageBox.Show(
+   90:                 this,
+   91:                 "В папке результата не найден SQL-файл.",
+   92:                 "Сборка 4 — база данных",
+   93:                 MessageBoxButton.OK,
+   94:                 MessageBoxImage.Warning);
+   95: 
+   96:             return;
+   97:         }
+   98: 
+   99:         var confirmation = MessageBox.Show(
+  100:             this,
+  101:             $"Выполнить этап 4 для {selectedJob.Domain}?\n\n" +
+  102:             "Программа:\n" +
+  103:             "1. Прочитает name, user и pass из config.php.\n" +
+  104:             "2. Проверит существование и доступность БД.\n" +
+  105:             "3. При необходимости создаст новую БД.\n" +
+  106:             "4. Импортирует локальный SQL-файл.\n\n" +
+  107:             "Если БД уже существует и реквизиты подходят, " +
+  108:             "создание будет пропущено, но SQL будет импортирован.",
+  109:             "Подтверждение этапа 4",
+  110:             MessageBoxButton.YesNo,
+  111:             MessageBoxImage.Warning);
+  112: 
+  113:         if (confirmation != MessageBoxResult.Yes)
+  114:         {
+  115:             return;
+  116:         }
+  117: 
+  118:         string sshPassword = string.Empty;
+  119: 
+  120:         try
+  121:         {
+  122:             SetBuild3Busy(true);
+  123:             DeployDatabaseButton.IsEnabled = false;
+  124: 
+  125:             Build4ProgressBar.Value = 0;
+  126:             Build4StatusTextBlock.Text =
+  127:                 "Подготовка этапа 4...";
+  128: 
+  129:             var settings = ReadSshSettings();
+  130: 
+  131:             sshPassword =
+  132:                 _sshDeploymentSettingsService.GetPassword(
+  133:                     settings,
+  134:                     SshPasswordBox.Password);
+  135: 
+  136:             settings.Validate(sshPassword);
+  137: 
+  138:             var progress =
+  139:                 new Progress<DatabaseDeploymentProgress>(
+  140:                     item =>
+  141:                     {
+  142:                         Build4ProgressBar.Value =
+  143:                             item.Percent;
+  144: 
+  145:                         Build4StatusTextBlock.Text =
+  146:                             $"{item.Percent}% — {item.Message}";
+  147: 
+  148:                         SetStatus(
+  149:                             $"{selectedJob.Domain}: " +
+  150:                             $"{item.Percent}% — {item.Message}");
+  151:                     });
+  152: 
+  153:             using var cancellation =
+  154:                 new CancellationTokenSource(
+  155:                     TimeSpan.FromMinutes(60));
+  156: 
+  157:             var result =
+  158:                 await _databaseDeploymentService.DeployAsync(
+  159:                     settings,
+  160:                     sshPassword,
+  161:                     selectedJob.OutputPath,
+  162:                     progress,
+  163:                     cancellation.Token);
+  164: 
+  165:             selectedJob.DatabaseName =
+  166:                 result.DatabaseName;
+  167: 
+  168:             selectedJob.DatabaseUser =
+  169:                 result.DatabaseUser;
+  170: 
+  171:             JobsGrid.Items.Refresh();
+  172: 
+  173:             var creationText =
+  174:                 result.DatabaseWasCreated
+  175:                     ? "БД была создана."
+  176:                     : "Использована уже существующая БД.";
+  177: 
+  178:             var message =
+  179:                 $"Этап 4 завершён для {selectedJob.Domain}.\n\n" +
+  180:                 $"База: {result.DatabaseName}\n" +
+  181:                 $"Пользователь: {result.DatabaseUser}\n" +
+  182:                 $"{creationText}\n" +
+  183:                 $"SQL импортирован: {Path.GetFileName(result.SqlFile)}";
+  184: 
+  185:             Build4ProgressBar.Value = 100;
+  186:             Build4StatusTextBlock.Text =
+  187:                 message.Replace('\n', ' ');
+  188: 
+  189:             SetStatus(
+  190:                 $"{selectedJob.Domain}: этап 4 завершён.");
+  191: 
+  192:             AddLog(
+  193:                 "INFO",
+  194:                 selectedJob.Domain,
+  195:                 $"БД {result.DatabaseName} готова; " +
+  196:                 "SQL импортирован.");
+  197: 
+  198:             MessageBox.Show(
+  199:                 this,
+  200:                 message,
+  201:                 "Сборка 4 — успешно",
+  202:                 MessageBoxButton.OK,
+  203:                 MessageBoxImage.Information);
+  204:         }
+  205:         catch (Exception exception)
+  206:         {
+  207:             var message =
+  208:                 SensitiveDataRedactor.Redact(
+  209:                     exception.Message);
+  210: 
+  211:             Build4StatusTextBlock.Text = message;
+  212:             SetStatus(message);
+  213: 
+  214:             AddLog(
+  215:                 "ERROR",
+  216:                 selectedJob.Domain,
+  217:                 message);
+  218: 
+  219:             MessageBox.Show(
+  220:                 this,
+  221:                 message,
+  222:                 "Ошибка этапа 4",
+  223:                 MessageBoxButton.OK,
+  224:                 MessageBoxImage.Error);
+  225:         }
+  226:         finally
+  227:         {
+  228:             sshPassword = string.Empty;
+  229: 
+  230:             SetBuild3Busy(false);
+  231:             DeployDatabaseButton.IsEnabled = true;
+  232:         }
+  233:     }
+  234: }
+
+================================================================================
+ФАЙЛ: C:\Users\User\Desktop\Adminki\. Программа домены\Новая папка\TextFileProcessor.csproj
+СТРОКИ: 1-300
+================================================================================
+    1: <Project Sdk="Microsoft.NET.Sdk">
+    2:   <PropertyGroup>
+    3:     <OutputType>WinExe</OutputType>
+    4:     <TargetFramework>net8.0-windows</TargetFramework>
+    5:     <Nullable>enable</Nullable>
+    6:     <ImplicitUsings>enable</ImplicitUsings>
+    7:     <UseWPF>true</UseWPF>
+    8:     <AssemblyName>TextFileProcessor</AssemblyName>
+    9:     <RootNamespace>TextFileProcessor</RootNamespace>
+   10:     <ApplicationManifest>app.manifest</ApplicationManifest>
+   11:     <PlatformTarget>x64</PlatformTarget>
+   12:     <Prefer32Bit>false</Prefer32Bit>
+   13:     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+   14:     <SelfContained>true</SelfContained>
+   15:     <PublishSingleFile>true</PublishSingleFile>
+   16:     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+   17:     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+   18:     <Version>1.0.0</Version>
+   19:     <Company>Local</Company>
+   20:     <Product>Domain Site Deployment Manager</Product>
+   21:   </PropertyGroup>
+   22:   <ItemGroup>
+   23:     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.20" />
+   24:     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+   25:   </ItemGroup>
+   26: 
+   27:   <!-- Устаревший незавершённый сервис исключён из Сборки 3. -->
+   28:   <ItemGroup>
+   29:     <Compile Remove="Services\SftpSettingsService.cs" />
+   30:       <PackageReference Include="SSH.NET" Version="2026.0.0" />
+   31: </ItemGroup>
+   32:   <!-- BUILD6_BACKUP_EXCLUSIONS -->
+   33:   <ItemGroup>
+   34:     <Compile Remove="**/backup-before-build6-*/**/*.cs" />
+   35:     <Compile Remove="**/.build*-backup-*/**/*.cs" />
+   36:   </ItemGroup>
+   37: </Project>
