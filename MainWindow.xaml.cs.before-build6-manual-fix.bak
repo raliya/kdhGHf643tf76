@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows;
 using Microsoft.Win32;
@@ -23,8 +23,6 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-  InitializeBuild6();
-        InitializeBuild7();
 
         JobsGrid.ItemsSource = _jobs;
         LogsGrid.ItemsSource = _logs;
@@ -600,4 +598,3 @@ public partial class MainWindow : Window
         string Domain,
         string SecondValue);
 }
-

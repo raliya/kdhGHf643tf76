@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Net.Http;
 using System.Xml.Linq;
 using TextFileProcessor.Models;
@@ -81,19 +81,33 @@ public sealed class IspmanagerAutomationService
                     $"WWW-домен {domain} уже существует в ISPmanager."
             };
         }
-        // Передаём только параметры, которые были указаны:
-        // домен, wildcard-псевдоним, HTTPS и отключение кеша.
-        // Режим и версия PHP не передаются — ISPmanager
-        // использует настройки по умолчанию.
-        var aliases = $"*.{domain} www.{domain}";
+
+        var aliases = $"www.{domain} *.{domain}";
 
         var parameters = new Dictionary<string, string>
         {
             ["sok"] = "ok",
+
+            // Официальные параметры site.edit.
             ["site_name"] = domain,
             ["site_aliases"] = aliases,
+            ["site_owner"] = settings.Owner.Trim(),
+            ["site_home"] = $"www/{domain}",
+
+            // Протокол HTTPS включается с временным
+            // самоподписанным сертификатом. Wildcard Let's Encrypt
+            // будет продолжен после создания ACME TXT-записей.
+            ["site_ssl_cert"] = "selfsigned",
             ["site_ssl"] = "on",
-            ["site_cache"] = "off"
+
+            // PHP-FPM и выбранная версия PHP.
+            ["site_php_mode"] = "php_fpm",
+            ["site_php_version"] =
+                settings.PhpVersion.Trim(),
+
+            // Кеширование отключено.
+            ["site_cache"] = "off",
+            ["site_nginx_cache"] = "off"
         };
 
         var createResult = await CallAsync(
@@ -132,6 +146,8 @@ public sealed class IspmanagerAutomationService
                         Message =
                             $"WWW-домен {domain} создан и найден " +
                             "в списке ISPmanager. " +
+                            $"Владелец: {settings.Owner}; " +
+                            $"PHP: {settings.PhpVersion}; " +
                             $"псевдонимы: {aliases}; " +
                             "HTTPS включён; кеширование отключено."
                     };

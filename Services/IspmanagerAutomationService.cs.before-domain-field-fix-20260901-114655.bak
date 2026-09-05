@@ -1,0 +1,1083 @@
+﻿using Microsoft.Playwright;
+using TextFileProcessor.Models;
+
+namespace TextFileProcessor.Services;
+
+public sealed class IspmanagerAutomationService
+{
+    private const int ActionTimeout = 30000;
+
+    public async Task<IspmanagerOperationResult> TestConnectionAsync(
+        IspmanagerSettings settings,
+        string password,
+        CancellationToken cancellationToken)
+    {
+        ValidateSettings(settings, password);
+
+        await using var session =
+            await OpenAuthenticatedSessionAsync(
+                settings,
+                password,
+                cancellationToken);
+
+        var page = session.Page;
+
+        var title = await page.TitleAsync();
+
+        return new IspmanagerOperationResult
+        {
+            Success = true,
+            Message =
+                "Вход в ISPmanager выполнен успешно. " +
+                $"Заголовок страницы: {title}"
+        };
+    }
+
+    public async Task<IspmanagerOperationResult> CreateWebDomainAsync(
+        IspmanagerSettings settings,
+        string password,
+        string domain,
+        CancellationToken cancellationToken)
+    {
+        ValidateSettings(settings, password);
+
+        if (string.IsNullOrWhiteSpace(domain))
+        {
+            throw new InvalidOperationException(
+                "Не указан домен для создания.");
+        }
+
+        await using var session =
+            await OpenAuthenticatedSessionAsync(
+                settings,
+                password,
+                cancellationToken);
+
+        var page = session.Page;
+
+        try
+        {
+            var panelBaseUrl =
+                NormalizePanelUrl(settings.PanelUrl);
+
+            var fragmentIndex =
+                panelBaseUrl.IndexOf('#');
+
+            if (fragmentIndex >= 0)
+            {
+                panelBaseUrl =
+                    panelBaseUrl[..fragmentIndex]
+                        .TrimEnd('/');
+            }
+
+            var createUrl =
+                panelBaseUrl +
+                "#/form?plid=&tconvert=punycode" +
+                "&func=site.edit&tab_id=3&tab_parent_id=2";
+
+            var webDomainsUrl =
+                panelBaseUrl +
+                "#/list?clickstat=yes&p_num=1" +
+                "&func=webdomain&tab_id=2";
+
+            await page.GotoAsync(
+                createUrl,
+                new PageGotoOptions
+                {
+                    WaitUntil = WaitUntilState.DOMContentLoaded,
+                    Timeout = ActionTimeout
+                });
+
+            // GotoAsync ожидает загрузку HTML, но не завершение
+            // отрисовки SPA-интерфейса ISPmanager.
+            await page.WaitForTimeoutAsync(3000);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var nameFilled = await FillFirstAsync(
+                page,
+                domain,
+                "input[name='site_name']",
+                "input[name='name']",
+                "input[name='domain']",
+                "input[name='domain_name']",
+                "input[name='webdomain']",
+                "input[name='elid']",
+                "input[id='site_name']",
+                "input[id='name']",
+                "input[id='domain']",
+                "input[id*='site_name']",
+                "input[id*='domain']",
+                "input[data-name='name']",
+                "input[data-name='domain']",
+                "input[placeholder*='www-домен' i]",
+                "input[placeholder*='домен' i]",
+                "input[placeholder*='domain' i]",
+                "input[aria-label*='www-домен' i]",
+                "input[aria-label*='домен' i]",
+                "input[aria-label*='domain' i]",
+                "input[aria-label*='имя сайта' i]",
+                "input[aria-label*='имя WWW' i]");
+
+            if (!nameFilled)
+            {
+                nameFilled =
+                    await FillInputAssociatedWithTextAsync(
+                        page,
+                        domain,
+                        "Имя WWW-домена",
+                        "Доменное имя",
+                        "Имя домена",
+                        "Имя сайта",
+                        "WWW-домен");
+            }
+
+            if (!nameFilled)
+            {
+                throw new InvalidOperationException(
+                    "Форма создания WWW-домена открыта, " +
+                    "но поле имени домена не найдено.");
+            }
+
+            var aliases =
+                $"www.{domain} *.{domain}";
+
+            await FillFirstAsync(
+                page,
+                aliases,
+                "textarea[name='site_aliases']",
+                "input[name='site_aliases']",
+                "textarea[name='aliases']",
+                "input[name='aliases']",
+                "textarea[id*='alias']",
+                "input[id*='alias']");
+
+            await FillFirstAsync(
+                page,
+                settings.Owner,
+                "input[name='site_owner']",
+                "input[name='owner']",
+                "input[id*='owner']");
+
+            await TrySelectOwnerAsync(
+                page,
+                settings.Owner);
+
+            await TrySelectPhpVersionAsync(
+                page,
+                settings.PhpVersion);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var submitted = await ClickFirstAsync(
+                page,
+                "button[type='submit']",
+                "button:has-text('Создать')",
+                "button:has-text('Сохранить')",
+                "button:has-text('Create')",
+                "button:has-text('Save')",
+                "input[type='submit']");
+
+            if (!submitted)
+            {
+                throw new InvalidOperationException(
+                    "Не найдена кнопка сохранения WWW-домена.");
+            }
+
+            await page.WaitForTimeoutAsync(2500);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var bodyText =
+                await page.Locator("body").InnerTextAsync();
+
+            var errorText = await FindVisibleErrorAsync(page);
+
+            if (!string.IsNullOrWhiteSpace(errorText))
+            {
+                throw new InvalidOperationException(
+                    "ISPmanager сообщил об ошибке: " +
+                    errorText);
+            }
+
+            if (bodyText.Contains(
+                    "error",
+                    StringComparison.OrdinalIgnoreCase) &&
+                !bodyText.Contains(
+                    domain,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "ISPmanager вернул страницу с ошибкой.");
+            }
+
+            await page.GotoAsync(
+                webDomainsUrl,
+                new PageGotoOptions
+                {
+                    WaitUntil = WaitUntilState.DOMContentLoaded,
+                    Timeout = ActionTimeout
+                });
+
+            await page.WaitForTimeoutAsync(2000);
+
+            var listText =
+                await page.Locator("body").InnerTextAsync();
+
+            if (!listText.Contains(
+                    domain,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "Команда отправлена, но домен не найден " +
+                    "в списке WWW-доменов. Проверьте панель вручную.");
+            }
+
+            return new IspmanagerOperationResult
+            {
+                Success = true,
+                Message =
+                    $"WWW-домен {domain} создан. " +
+                    $"Владелец: {settings.Owner}; " +
+                    $"PHP: {settings.PhpVersion}; " +
+                    $"алиасы: {aliases}."
+            };
+        }
+        catch (Exception exception)
+        {
+            var screenshotPath =
+                await SaveDiagnosticScreenshotAsync(
+                    page,
+                    "create-domain");
+
+            throw new InvalidOperationException(
+                exception.Message +
+                (string.IsNullOrWhiteSpace(screenshotPath)
+                    ? string.Empty
+                    : $" Диагностика: {screenshotPath}"),
+                exception);
+        }
+    }
+
+    private static async Task<BrowserSession>
+        OpenAuthenticatedSessionAsync(
+            IspmanagerSettings settings,
+            string password,
+            CancellationToken cancellationToken)
+    {
+        var playwright = await Playwright.CreateAsync();
+
+        try
+        {
+            var browser = await playwright.Chromium.LaunchAsync(
+                new BrowserTypeLaunchOptions
+                {
+                    Headless = !settings.ShowBrowser
+                });
+
+            try
+            {
+                var context = await browser.NewContextAsync(
+                    new BrowserNewContextOptions
+                    {
+                        IgnoreHTTPSErrors =
+                            settings.IgnoreCertificateErrors,
+                        Locale = "ru-RU",
+                        ViewportSize = new ViewportSize
+                        {
+                            Width = 1440,
+                            Height = 1000
+                        }
+                    });
+
+                var page = await context.NewPageAsync();
+
+                page.SetDefaultTimeout(ActionTimeout);
+                page.SetDefaultNavigationTimeout(ActionTimeout);
+
+                await page.GotoAsync(
+                    NormalizePanelUrl(settings.PanelUrl),
+                    new PageGotoOptions
+                    {
+                        WaitUntil =
+                            WaitUntilState.DOMContentLoaded,
+                        Timeout = ActionTimeout
+                    });
+
+                await page.WaitForTimeoutAsync(1200);
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var passwordLocator =
+                    page.Locator("input[type='password']").First;
+
+                if (await passwordLocator.CountAsync() > 0 &&
+                    await passwordLocator.IsVisibleAsync())
+                {
+                    var loginFilled = await FillFirstAsync(
+                        page,
+                        settings.Login,
+                        "input[name='username']",
+                        "input[name='login']",
+                        "input[name='user']",
+                        "input[autocomplete='username']",
+                        "input[type='text']");
+
+                    if (!loginFilled)
+                    {
+                        throw new InvalidOperationException(
+                            "На странице входа не найдено поле логина.");
+                    }
+
+                    await passwordLocator.FillAsync(password);
+
+                    var clicked = await ClickFirstAsync(
+                        page,
+                        "button[type='submit']",
+                        "button:has-text('Войти')",
+                        "button:has-text('Login')",
+                        "input[type='submit']");
+
+                    if (!clicked)
+                    {
+                        await passwordLocator.PressAsync("Enter");
+                    }
+
+                    await page.WaitForTimeoutAsync(2500);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var passwordStillVisible =
+                    await IsAnyVisibleAsync(
+                        page,
+                        "input[type='password']");
+
+                if (passwordStillVisible)
+                {
+                    var loginError =
+                        await FindVisibleErrorAsync(page);
+
+                    throw new InvalidOperationException(
+                        string.IsNullOrWhiteSpace(loginError)
+                            ? "Вход в ISPmanager не выполнен. " +
+                              "Проверьте логин и пароль."
+                            : "Вход в ISPmanager не выполнен: " +
+                              loginError);
+                }
+
+                var currentText =
+                    await page.Locator("body").InnerTextAsync();
+
+                if (currentText.Contains(
+                        "Неверный пароль",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    currentText.Contains(
+                        "Invalid password",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        "ISPmanager отклонил логин или пароль.");
+                }
+
+                return new BrowserSession(
+                    playwright,
+                    browser,
+                    context,
+                    page);
+            }
+            catch
+            {
+                await browser.DisposeAsync();
+                throw;
+            }
+        }
+        catch
+        {
+            playwright.Dispose();
+            throw;
+        }
+    }
+
+    private static void ValidateSettings(
+        IspmanagerSettings settings,
+        string password)
+    {
+        if (!Uri.TryCreate(
+                settings.PanelUrl,
+                UriKind.Absolute,
+                out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttps &&
+             uri.Scheme != Uri.UriSchemeHttp))
+        {
+            throw new InvalidOperationException(
+                "Укажите корректный URL панели ISPmanager.");
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.Login))
+        {
+            throw new InvalidOperationException(
+                "Укажите логин ISPmanager.");
+        }
+
+        if (string.IsNullOrEmpty(password))
+        {
+            throw new InvalidOperationException(
+                "Введите пароль ISPmanager.");
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.Owner))
+        {
+            throw new InvalidOperationException(
+                "Укажите владельца WWW-домена.");
+        }
+    }
+
+    private static string NormalizePanelUrl(string panelUrl)
+    {
+        return panelUrl.Trim().TrimEnd('/');
+    }
+
+    private static string BuildWebDomainListUrl(
+        string panelUrl)
+    {
+        var url = NormalizePanelUrl(panelUrl);
+
+        var fragmentIndex = url.IndexOf('#');
+
+        if (fragmentIndex >= 0)
+        {
+            url = url[..fragmentIndex].TrimEnd('/');
+        }
+
+        return url +
+               "#/list?clickstat=yes&p_num=1" +
+               "&func=webdomain&tab_id=2";
+    }
+    private static string BuildFunctionUrl(
+        string panelUrl,
+        string function)
+    {
+        var url = NormalizePanelUrl(panelUrl);
+        var separator = url.Contains('?') ? "&" : "?";
+
+        return url +
+               separator +
+               "func=" +
+               Uri.EscapeDataString(function);
+    }
+
+    private static async Task<bool> FillDomainNameAsync(
+        IPage page,
+        string domain)
+    {
+        var filled = await FillFirstAsync(
+            page,
+            domain,
+            "input[name='site_name']",
+            "input[name='name']",
+            "input[name='domain']",
+            "input[name='domain_name']",
+            "input[name='webdomain']",
+            "input[id='site_name']",
+            "input[id='name']",
+            "input[id='domain']",
+            "input[id*='site_name']",
+            "input[id*='domain']",
+            "input[placeholder*='домен' i]",
+            "input[placeholder*='domain' i]",
+            "input[placeholder*='example' i]",
+            "input[aria-label*='домен' i]",
+            "input[aria-label*='domain' i]",
+            "input[aria-label*='имя сайта' i]",
+            "input[aria-label*='имя WWW' i]");
+
+        if (filled)
+        {
+            return true;
+        }
+
+        ILocator scope = page.Locator("body");
+
+        var dialogs = page.Locator(
+            "[role='dialog']:visible, " +
+            ".modal:visible, " +
+            "[class*='modal']:visible, " +
+            "[class*='dialog']:visible");
+
+        if (await dialogs.CountAsync() > 0)
+        {
+            scope = dialogs.Last;
+        }
+
+        var inputs = scope.Locator(
+            "input:not([type='hidden']):visible");
+
+        var inputCount = await inputs.CountAsync();
+
+        ILocator? bestInput = null;
+        var bestScore = int.MinValue;
+        var editableInputs = new List<ILocator>();
+
+        for (var index = 0;
+             index < inputCount;
+             index++)
+        {
+            var input = inputs.Nth(index);
+
+            try
+            {
+                if (!await input.IsVisibleAsync() ||
+                    !await input.IsEditableAsync())
+                {
+                    continue;
+                }
+
+                var type =
+                    (await input.GetAttributeAsync("type") ??
+                     "text").ToLowerInvariant();
+
+                if (type is
+                    "password" or
+                    "checkbox" or
+                    "radio" or
+                    "submit" or
+                    "button" or
+                    "file")
+                {
+                    continue;
+                }
+
+                editableInputs.Add(input);
+
+                var name =
+                    await input.GetAttributeAsync("name") ??
+                    string.Empty;
+
+                var id =
+                    await input.GetAttributeAsync("id") ??
+                    string.Empty;
+
+                var placeholder =
+                    await input.GetAttributeAsync("placeholder") ??
+                    string.Empty;
+
+                var ariaLabel =
+                    await input.GetAttributeAsync("aria-label") ??
+                    string.Empty;
+
+                var testId =
+                    await input.GetAttributeAsync("data-testid") ??
+                    string.Empty;
+
+                var description =
+                    string.Join(
+                        " ",
+                        name,
+                        id,
+                        placeholder,
+                        ariaLabel,
+                        testId)
+                    .ToLowerInvariant();
+
+                var score = 0;
+
+                if (description.Contains("domain"))
+                {
+                    score += 20;
+                }
+
+                if (description.Contains("домен"))
+                {
+                    score += 20;
+                }
+
+                if (description.Contains("webdomain"))
+                {
+                    score += 25;
+                }
+
+                if (description.Contains("site_name") ||
+                    description.Contains("sitename"))
+                {
+                    score += 18;
+                }
+
+                if (description.Contains("имя сайта") ||
+                    description.Contains("имя www"))
+                {
+                    score += 18;
+                }
+
+                if (description.Contains("name"))
+                {
+                    score += 4;
+                }
+
+                if (description.Contains("site"))
+                {
+                    score += 4;
+                }
+
+                if (description.Contains("search") ||
+                    description.Contains("поиск") ||
+                    description.Contains("filter") ||
+                    description.Contains("фильтр"))
+                {
+                    score -= 100;
+                }
+
+                if (description.Contains("owner") ||
+                    description.Contains("владел"))
+                {
+                    score -= 50;
+                }
+
+                if (description.Contains("alias") ||
+                    description.Contains("псевдоним"))
+                {
+                    score -= 50;
+                }
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestInput = input;
+                }
+            }
+            catch
+            {
+                // Элемент мог быть перерисован интерфейсом.
+            }
+        }
+
+        if (bestInput is not null &&
+            bestScore > 0)
+        {
+            try
+            {
+                await bestInput.FillAsync(domain);
+                return true;
+            }
+            catch
+            {
+                // Ниже используется безопасный запасной вариант.
+            }
+        }
+
+        if (editableInputs.Count == 1)
+        {
+            try
+            {
+                await editableInputs[0].FillAsync(domain);
+                return true;
+            }
+            catch
+            {
+                // Поле недоступно.
+            }
+        }
+
+        return false;
+    }
+    private static async Task<bool>
+        FillInputAssociatedWithTextAsync(
+            IPage page,
+            string value,
+            params string[] labelTexts)
+    {
+        foreach (var labelText in labelTexts)
+        {
+            var escapedText =
+                labelText.Replace(
+                    "'",
+                    "\'",
+                    StringComparison.Ordinal);
+
+            var selectors = new[]
+            {
+                $"label:has-text('{escapedText}') input",
+                $"label:has-text('{escapedText}') textarea",
+                $"div:has(> label:has-text('{escapedText}')) input",
+                $"div:has(> span:has-text('{escapedText}')) input",
+                $"div:has-text('{escapedText}') input"
+            };
+
+            foreach (var selector in selectors)
+            {
+                var candidates =
+                    page.Locator(selector);
+
+                var count =
+                    await candidates.CountAsync();
+
+                for (var index = 0;
+                     index < count;
+                     index++)
+                {
+                    var candidate =
+                        candidates.Nth(index);
+
+                    try
+                    {
+                        if (!await candidate.IsVisibleAsync() ||
+                            !await candidate.IsEditableAsync())
+                        {
+                            continue;
+                        }
+
+                        var type =
+                            (await candidate.GetAttributeAsync(
+                                "type") ??
+                             "text")
+                            .ToLowerInvariant();
+
+                        if (type is
+                            "hidden" or
+                            "password" or
+                            "checkbox" or
+                            "radio" or
+                            "button" or
+                            "submit" or
+                            "file")
+                        {
+                            continue;
+                        }
+
+                        await candidate.FillAsync(value);
+                        return true;
+                    }
+                    catch
+                    {
+                        // SPA могла перерисовать элемент.
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+    private static async Task<bool> FillFirstAsync(
+        IPage page,
+        string value,
+        params string[] selectors)
+    {
+        foreach (var selector in selectors)
+        {
+            var locator = page.Locator(selector).First;
+
+            if (await locator.CountAsync() == 0)
+            {
+                continue;
+            }
+
+            try
+            {
+                if (!await locator.IsVisibleAsync())
+                {
+                    continue;
+                }
+
+                await locator.FillAsync(value);
+                return true;
+            }
+            catch
+            {
+                // Пробуем следующий вариант селектора.
+            }
+        }
+
+        return false;
+    }
+
+    private static async Task<bool> ClickFirstAsync(
+        IPage page,
+        params string[] selectors)
+    {
+        foreach (var selector in selectors)
+        {
+            var locator = page.Locator(selector).First;
+
+            if (await locator.CountAsync() == 0)
+            {
+                continue;
+            }
+
+            try
+            {
+                if (!await locator.IsVisibleAsync())
+                {
+                    continue;
+                }
+
+                await locator.ClickAsync();
+                return true;
+            }
+            catch
+            {
+                // Пробуем следующий вариант селектора.
+            }
+        }
+
+        return false;
+    }
+
+    private static async Task<bool> IsAnyVisibleAsync(
+        IPage page,
+        string selector)
+    {
+        var locator = page.Locator(selector);
+
+        var count = await locator.CountAsync();
+
+        for (var index = 0; index < count; index++)
+        {
+            if (await locator.Nth(index).IsVisibleAsync())
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static async Task TrySelectOwnerAsync(
+        IPage page,
+        string owner)
+    {
+        var selectors = new[]
+        {
+            "select[name='site_owner']",
+            "select[name='owner']",
+            "select[id*='owner']"
+        };
+
+        foreach (var selector in selectors)
+        {
+            var select = page.Locator(selector).First;
+
+            if (await select.CountAsync() == 0)
+            {
+                continue;
+            }
+
+            try
+            {
+                await select.SelectOptionAsync(
+                    new SelectOptionValue
+                    {
+                        Label = owner
+                    });
+
+                return;
+            }
+            catch
+            {
+                try
+                {
+                    await select.SelectOptionAsync(owner);
+                    return;
+                }
+                catch
+                {
+                    // В конкретной панели владелец может быть input.
+                }
+            }
+        }
+    }
+
+    private static async Task TrySelectPhpVersionAsync(
+        IPage page,
+        string phpVersion)
+    {
+        var selectors = new[]
+        {
+            "select[name='site_php_version']",
+            "select[name='php_version']",
+            "select[id*='php_version']",
+            "select[id*='php-version']"
+        };
+
+        foreach (var selector in selectors)
+        {
+            var select = page.Locator(selector).First;
+
+            if (await select.CountAsync() == 0)
+            {
+                continue;
+            }
+
+            try
+            {
+                var options = select.Locator("option");
+                var count = await options.CountAsync();
+
+                for (var index = 0; index < count; index++)
+                {
+                    var option = options.Nth(index);
+                    var text = (await option.InnerTextAsync()).Trim();
+
+                    if (!text.Contains(
+                            phpVersion,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var value =
+                        await option.GetAttributeAsync("value");
+
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        await select.SelectOptionAsync(value);
+                    }
+                    else
+                    {
+                        await select.SelectOptionAsync(
+                            new SelectOptionValue
+                            {
+                                Label = text
+                            });
+                    }
+
+                    return;
+                }
+            }
+            catch
+            {
+                // Оставляем выбор панели по умолчанию.
+            }
+        }
+
+        await FillFirstAsync(
+            page,
+            phpVersion,
+            "input[name='site_php_version']",
+            "input[name='php_version']",
+            "input[id*='php_version']");
+    }
+
+    private static async Task<string> FindVisibleErrorAsync(
+        IPage page)
+    {
+        var selectors = new[]
+        {
+            "[role='alert']",
+            ".alert-danger",
+            ".error",
+            ".form-error",
+            ".notification-error",
+            "[class*='error-message']"
+        };
+
+        foreach (var selector in selectors)
+        {
+            var elements = page.Locator(selector);
+            var count = await elements.CountAsync();
+
+            for (var index = 0; index < count; index++)
+            {
+                var element = elements.Nth(index);
+
+                try
+                {
+                    if (!await element.IsVisibleAsync())
+                    {
+                        continue;
+                    }
+
+                    var text = (await element.InnerTextAsync()).Trim();
+
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        return text.Length > 500
+                            ? text[..500]
+                            : text;
+                    }
+                }
+                catch
+                {
+                    // Пропускаем недоступный элемент.
+                }
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static async Task<string>
+        SaveDiagnosticScreenshotAsync(
+            IPage page,
+            string operation)
+    {
+        try
+        {
+            var directory = Path.Combine(
+                Environment.GetFolderPath(
+                    Environment.SpecialFolder.LocalApplicationData),
+                "TextFileProcessor",
+                "Diagnostics");
+
+            Directory.CreateDirectory(directory);
+
+            var path = Path.Combine(
+                directory,
+                $"{operation}-{DateTime.Now:yyyyMMdd-HHmmss}.png");
+
+            await page.ScreenshotAsync(
+                new PageScreenshotOptions
+                {
+                    Path = path,
+                    FullPage = true
+                });
+
+            return path;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private sealed class BrowserSession : IAsyncDisposable
+    {
+        private readonly IPlaywright _playwright;
+        private readonly IBrowser _browser;
+        private readonly IBrowserContext _context;
+
+        public IPage Page { get; }
+
+        public BrowserSession(
+            IPlaywright playwright,
+            IBrowser browser,
+            IBrowserContext context,
+            IPage page)
+        {
+            _playwright = playwright;
+            _browser = browser;
+            _context = context;
+            Page = page;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                await _context.DisposeAsync();
+            }
+            finally
+            {
+                try
+                {
+                    await _browser.DisposeAsync();
+                }
+                finally
+                {
+                    _playwright.Dispose();
+                }
+            }
+        }
+    }
+}
+
+

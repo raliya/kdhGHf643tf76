@@ -347,15 +347,15 @@ public sealed class DatabaseDeploymentService
         string remoteSecret)
     {
         return
-$$"""
+$"""
 #!/bin/sh
 set -u
 
-DATABASE_NAME={{ShellQuote(databaseName)}}
-DATABASE_USER={{ShellQuote(databaseUser)}}
-DATABASE_OWNER={{ShellQuote(owner)}}
-REMOTE_SQL={{ShellQuote(remoteSql)}}
-SECRET_FILE={{ShellQuote(remoteSecret)}}
+DATABASE_NAME={ShellQuote(databaseName)}
+DATABASE_USER={ShellQuote(databaseUser)}
+DATABASE_OWNER={ShellQuote(owner)}
+REMOTE_SQL={ShellQuote(remoteSql)}
+SECRET_FILE={ShellQuote(remoteSecret)}
 
 if [ ! -f "$REMOTE_SQL" ]; then
     echo "SQL-файл не найден." >&2
@@ -363,7 +363,7 @@ if [ ! -f "$REMOTE_SQL" ]; then
 fi
 
 if [ ! -f "$SECRET_FILE" ]; then
-    echo "Файл с паролем БД не найден." >&2
+    echo "Файл реквизитов не найден." >&2
     exit 32
 fi
 
@@ -386,91 +386,102 @@ else
     exit 34
 fi
 
-check_database_access()
-{
-    "$DB_CLIENT" \
-        --connect-timeout=10 \
-        --user="$DATABASE_USER" \
-        --database="$DATABASE_NAME" \
-        --execute="SELECT 1" \
-        >/dev/null 2>&1
-}
-
 DATABASE_CREATED=0
 
-if check_database_access; then
+# Сначала проверяем, доступна ли существующая база данных.
+if "$DB_CLIENT" \
+    --user="$DATABASE_USER" \
+    --database="$DATABASE_NAME" \
+    --connect-timeout=5 \
+    --execute="SELECT 1" \
+    >/dev/null 2>&1
+then
     echo "DATABASE_ALREADY_AVAILABLE"
 else
-    echo "Доступ к БД отсутствует. Синхронизация реквизитов ISPmanager."
-
-    EDIT_OUTPUT="$(
+    CREATE_OUTPUT="$(
         /usr/local/mgr5/sbin/mgrctl \
             -m ispmgr \
             db.edit \
-            elid="$DATABASE_NAME" \
             name="$DATABASE_NAME" \
             owner="$DATABASE_OWNER" \
             server="MySQL" \
             charset="utf8mb4" \
             user="*" \
             username="$DATABASE_USER" \
-            -e "password=$DB_PASSWORD" \
-            -e "confirm=$DB_PASSWORD" \
+            -e password=DB_PASSWORD \
+            -e confirm=DB_PASSWORD \
             hide_remote_access=on \
             remote_access=off \
             sok=ok 2>&1
     )"
-    EDIT_STATUS=$?
 
-    if [ "$EDIT_STATUS" -eq 0 ]; then
-        echo "DATABASE_CREDENTIALS_UPDATED"
-    else
-        echo "БД не найдена для редактирования. Выполняется создание."
+    CREATE_STATUS=$?
 
-        CREATE_OUTPUT="$(
-            /usr/local/mgr5/sbin/mgrctl \
-                -m ispmgr \
-                db.edit \
-                name="$DATABASE_NAME" \
-                owner="$DATABASE_OWNER" \
-                server="MySQL" \
-                charset="utf8mb4" \
-                user="*" \
-                username="$DATABASE_USER" \
-                -e "password=$DB_PASSWORD" \
-                -e "confirm=$DB_PASSWORD" \
-                hide_remote_access=on \
-                remote_access=off \
-                sok=ok 2>&1
-        )"
-        CREATE_STATUS=$?
-
-        if [ "$CREATE_STATUS" -ne 0 ]; then
-            printf '%s\n' "$EDIT_OUTPUT" >&2
-            printf '%s\n' "$CREATE_OUTPUT" >&2
-            echo "ISPmanager не создал и не обновил базу данных." >&2
-            exit "$CREATE_STATUS"
-        fi
-
+    if [ "$CREATE_STATUS" -eq 0 ]; then
         DATABASE_CREATED=1
         echo "DATABASE_CREATED"
-    fi
-
-    if ! check_database_access; then
-        unset MYSQL_PWD
-        unset DB_PASSWORD
-        DB_PASSWORD=""
-
-        echo "ISPmanager обработал команду, но пароль пользователя MySQL" >&2
-        echo "не совпадает с паролем из config.php." >&2
-        echo "Повторные подключения не выполняются: ERROR 1045 не является ожиданием запуска БД." >&2
-        exit 41
+    else
+        case "$CREATE_OUTPUT" in
+            *"exists(name)"*|*"already exists"*|*"already_exists"*)
+                echo "DATABASE_ALREADY_EXISTS"
+                printf '%s\n' "$CREATE_OUTPUT" >&2
+                ;;
+            *)
+                printf '%s\n' "$CREATE_OUTPUT" >&2
+                echo "ISPmanager не создал базу данных." >&2
+                exit "$CREATE_STATUS"
+                ;;
+        esac
     fi
 fi
 
-"$DB_CLIENT" \
+# Создание базы и пользователя может завершаться не мгновенно.
+# Проверяем подключение до 20 раз с паузой 3 секунды.
+DB_READY=0
+DB_ATTEMPT=1
+LAST_DB_ERROR=""
+
+while [ "$DB_ATTEMPT" -le 20 ]; do
+    LAST_DB_ERROR="$(
+        "$DB_CLIENT" \
+            --user="$DATABASE_USER" \
+            --database="$DATABASE_NAME" \
+            --connect-timeout=5 \
+            --execute="SELECT 1" 2>&1
+    )"
+
+    DB_STATUS=$?
+
+    if [ "$DB_STATUS" -eq 0 ]; then
+        DB_READY=1
+        echo "DATABASE_CONNECTION_OK"
+        break
+    fi
+
+    echo "Ожидание готовности БД: попытка $DB_ATTEMPT из 20." >&2
+
+    if [ -n "$LAST_DB_ERROR" ]; then
+        printf 'MySQL: %s\n' "$LAST_DB_ERROR" >&2
+    fi
+
+    if [ "$DB_ATTEMPT" -lt 20 ]; then
+        sleep 3
+    fi
+
+    DB_ATTEMPT=$((DB_ATTEMPT + 1))
+done
+
+if [ "$DB_READY" -ne 1 ]; then
+    echo "Подключение к базе данных не удалось." >&2
+
+    if [ -n "$LAST_DB_ERROR" ]; then
+        printf 'Последняя ошибка MySQL: %s\n' "$LAST_DB_ERROR" >&2
+    fi
+
+    echo "Проверьте имя базы, пользователя и пароль в config.php." >&2
+    exit 41
+fi"$DB_CLIENT" \
     --default-character-set=utf8mb4 \
-    --connect-timeout=10 \
     --user="$DATABASE_USER" \
     --database="$DATABASE_NAME" \
     < "$REMOTE_SQL"
@@ -490,6 +501,7 @@ echo "SQL_IMPORT_OK"
 exit 0
 """;
     }
+
     private static string ReadPhpValue(
         string configText,
         string key)

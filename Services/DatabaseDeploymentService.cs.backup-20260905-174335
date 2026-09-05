@@ -347,15 +347,15 @@ public sealed class DatabaseDeploymentService
         string remoteSecret)
     {
         return
-$$"""
+$"""
 #!/bin/sh
 set -u
 
-DATABASE_NAME={{ShellQuote(databaseName)}}
-DATABASE_USER={{ShellQuote(databaseUser)}}
-DATABASE_OWNER={{ShellQuote(owner)}}
-REMOTE_SQL={{ShellQuote(remoteSql)}}
-SECRET_FILE={{ShellQuote(remoteSecret)}}
+DATABASE_NAME={ShellQuote(databaseName)}
+DATABASE_USER={ShellQuote(databaseUser)}
+DATABASE_OWNER={ShellQuote(owner)}
+REMOTE_SQL={ShellQuote(remoteSql)}
+SECRET_FILE={ShellQuote(remoteSecret)}
 
 if [ ! -f "$REMOTE_SQL" ]; then
     echo "SQL-файл не найден." >&2
@@ -414,8 +414,8 @@ else
             charset="utf8mb4" \
             user="*" \
             username="$DATABASE_USER" \
-            -e "password=$DB_PASSWORD" \
-            -e "confirm=$DB_PASSWORD" \
+            -e 'password=$DB_PASSWORD' \
+            -e 'confirm=$DB_PASSWORD' \
             hide_remote_access=on \
             remote_access=off \
             sok=ok 2>&1
@@ -437,8 +437,8 @@ else
                 charset="utf8mb4" \
                 user="*" \
                 username="$DATABASE_USER" \
-                -e "password=$DB_PASSWORD" \
-                -e "confirm=$DB_PASSWORD" \
+                -e 'password=$DB_PASSWORD' \
+                -e 'confirm=$DB_PASSWORD' \
                 hide_remote_access=on \
                 remote_access=off \
                 sok=ok 2>&1

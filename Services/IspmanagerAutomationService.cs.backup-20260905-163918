@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Net.Http;
 using System.Xml.Linq;
 using TextFileProcessor.Models;
@@ -85,7 +85,7 @@ public sealed class IspmanagerAutomationService
         // домен, wildcard-псевдоним, HTTPS и отключение кеша.
         // Режим и версия PHP не передаются — ISPmanager
         // использует настройки по умолчанию.
-        var aliases = $"*.{domain} www.{domain}";
+        var aliases = $"*.{domain}";
 
         var parameters = new Dictionary<string, string>
         {
